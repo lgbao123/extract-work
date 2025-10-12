@@ -1,0 +1,40 @@
+pip install pandas numpy openpyxl xlsxwriter gspread gspread_dataframe oauth2client
+
+
+Đây là báo cáo công việc của 1 nhân viên . Tôi muốn  thiết kế database để sao này có thể quản lý tổng hợp  từ nhiều người và làm dashboard có thể dùng nosql
+cấu trúc file gốc bao gồm:
+A. Thực hiện công việc tháng Từ ngày 20/08/2025 đến hết ngày 20/09/2025
+I. Công việc theo chức năng vị trí
+1. CV1
+2. CV2 ( tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt)
+II. Công việc tham gia các dự án
+1. CV1
+2. CV2 ( tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt)
+III. ĐÁNH GIÁ CHUNG
+3.1. Về công việc hằng ngày:
+3.2. Thực hiện chuyên môn
+B. Kế hoạch công việc tháng tiếp theo: (Từ ngày 21/09/2025 đến hết ngày 20/10/2025)
+I. Công việc theo chức năng vị trí
+1. CV1
+2. CV2 ( tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt)
+II. Công việc tham gia các dự án
+1. CV1
+2. CV2 ( tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt)
+
+cho tôi một promt chuẩn
+
+
+
+JSON Schema (draft-07) cho từng collection, gồm:
+
+Kiểu dữ liệu, ràng buộc bắt buộc, enum cho section (A.I, A.II, A.III, B.I, B.II), task_type (ke_hoach, dot_xuat, thuong_xuyen…), status.
+
+Các trường đề xuất:
+
+employees: employee_code, full_name, department, position, email.
+reports: employee_id, period_from, period_to, report_month_key (yyyyMM), created_at.
+tasks: report_id, section, stt, title, task_type, time_from, time_to, frequency, result, difficulty_note, cost_vnd, project_id?, parent_task_id?, tags[].
+subtasks: giống tasks nhưng có parent_task_id bắt buộc.
+evaluations: report_id, topic (hang_ngay, chuyen_mon), content.
+projects: project_code, project_name, owner_dept.
+attachments: report_id/task_id, file_name, mime_type, source_path.
