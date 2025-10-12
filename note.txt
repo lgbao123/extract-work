@@ -1,40 +1,234 @@
 pip install pandas numpy openpyxl xlsxwriter gspread gspread_dataframe oauth2client
 
 
-Đây là báo cáo công việc của 1 nhân viên . Tôi muốn  thiết kế database để sao này có thể quản lý tổng hợp  từ nhiều người và làm dashboard có thể dùng nosql
-cấu trúc file gốc bao gồm:
-A. Thực hiện công việc tháng Từ ngày 20/08/2025 đến hết ngày 20/09/2025
+Đây là báo cáo công việc của 1 nhân viên . Tôi muốn thiết kế database (nosql) để sao này có thể quản lý tổng hợp từ nhiều người và làm dashboard 
+cấu trúc file gốc báo cáo bao gồm:
+A. Thực hiện công việc tháng hien tai (Từ ngày 20/08/2025 đến hết ngày 20/09/2025)
 I. Công việc theo chức năng vị trí
+(stt,Công việc, Loại công việc, Từ, Đến, Mô tả yêu cầu, giải pháp để thực hiện,Đ/G KQ)
 1. CV1
-2. CV2 ( tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt)
+2. CV2 
+-> tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt
 II. Công việc tham gia các dự án
 1. CV1
-2. CV2 ( tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt)
+2. CV2
+-> tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt
 III. ĐÁNH GIÁ CHUNG
 3.1. Về công việc hằng ngày:
 3.2. Thực hiện chuyên môn
 B. Kế hoạch công việc tháng tiếp theo: (Từ ngày 21/09/2025 đến hết ngày 20/10/2025)
 I. Công việc theo chức năng vị trí
+(stt,Công việc, Loại công việc, Từ, Đến, Mô tả yêu cầu, giải pháp để thực hiện,Chi phí thực hiện (VNĐ))
 1. CV1
-2. CV2 ( tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt)
+2. CV2 
+-> tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt
 II. Công việc tham gia các dự án
 1. CV1
-2. CV2 ( tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt)
+2. CV2
+-> tuỳ thuộc công việc thì sẽ có subtask hoặc không có thể thấy thông qua stt
 
 cho tôi một promt chuẩn
 
 
 
-JSON Schema (draft-07) cho từng collection, gồm:
+Tôi cần thiết kế và phát triển một hệ thống quản lý báo cáo công việc với các yêu cầu sau:
 
-Kiểu dữ liệu, ràng buộc bắt buộc, enum cho section (A.I, A.II, A.III, B.I, B.II), task_type (ke_hoach, dot_xuat, thuong_xuyen…), status.
+## 1. YÊU CẦU TỔNG QUAN
 
-Các trường đề xuất:
+Xây dựng hệ thống để:
+- Extract dữ liệu báo cáo công việc từ file Excel
+- Lưu trữ vào MongoDB (NoSQL)
+- Quản lý và tổng hợp báo cáo từ nhiều nhân viên
+- Hỗ trợ xây dựng dashboard phân tích
 
-employees: employee_code, full_name, department, position, email.
-reports: employee_id, period_from, period_to, report_month_key (yyyyMM), created_at.
-tasks: report_id, section, stt, title, task_type, time_from, time_to, frequency, result, difficulty_note, cost_vnd, project_id?, parent_task_id?, tags[].
-subtasks: giống tasks nhưng có parent_task_id bắt buộc.
-evaluations: report_id, topic (hang_ngay, chuyen_mon), content.
-projects: project_code, project_name, owner_dept.
-attachments: report_id/task_id, file_name, mime_type, source_path.
+## 2. CẤU TRÚC DỮ LIỆU NGUỒN (EXCEL)
+
+### Phần A: Thực Hiện Công Việc Tháng Hiện Tại
+Kỳ báo cáo: Từ ngày 20/MM/YYYY đến 20/MM+1/YYYY
+
+**Nhóm I: Công việc theo chức năng vị trí**
+- STT (hỗ trợ phân cấp: 1, 1.1, 1.1.1, ...)
+- Tên công việc
+- Loại công việc
+- Thời gian: Từ ngày - Đến ngày
+- Mô tả yêu cầu, giải pháp để thực hiện
+- Đánh giá kết quả (Đ/G KQ)
+
+**Nhóm II: Công việc tham gia dự án**
+- Cấu trúc tương tự Nhóm I
+- Hỗ trợ subtask theo STT
+
+**Nhóm III: Đánh giá chung**
+- 3.1. Về công việc hằng ngày (text)
+- 3.2. Thực hiện chuyên môn (text)
+
+### Phần B: Kế Hoạch Công Việc Tháng Tiếp Theo
+Kỳ kế hoạch: Từ ngày 21/MM/YYYY đến 20/MM+1/YYYY
+
+**Nhóm I & II:** Tương tự Phần A nhưng thay "Đánh giá kết quả" bằng "Chi phí thực hiện (VNĐ)"
+
+## 3. YÊU CẦU THIẾT KẾ DATABASE (MONGODB)
+
+### 3.1. Schema Design
+- Thiết kế collections phù hợp: employees, work_reports, projects, task_types
+- Xử lý quan hệ: Nhân viên - Báo cáo - Công việc - Subtask
+- Hỗ trợ phân cấp công việc (task/subtask) linh hoạt không giới hạn level
+- Phân biệt rõ phần "thực hiện" và phần "kế hoạch"
+- Mỗi task phải có các field: hasSubtasks (boolean), subtaskCount (number), children (array taskId)
+
+### 3.2. Indexes
+- Tạo indexes tối ưu cho query performance
+- Composite indexes cho truy vấn phổ biến
+- Text search index cho tìm kiếm công việc
+
+### 3.3. Sample Documents
+- Ví dụ đầy đủ cho mỗi collection
+- Bao gồm cả trường hợp có subtask và không có subtask
+
+## 4. YÊU CẦU XỬ LÝ DỮ LIỆU
+
+### 4.1. Parse STT (Số thứ tự)
+- Tự động nhận diện cấp độ: "1" (level 0), "1.1" (level 1), "1.1.1" (level 2)
+- Xác định parent task dựa trên STT
+- Xử lý cả trường hợp chỉ có task chính (không có subtask)
+- Xử lý trường hợp mixed (một số task có subtask, một số không)
+
+### 4.2. Parse Date
+- Hỗ trợ nhiều format: dd/mm/yyyy, dd/mm/yy, yyyy-mm-dd
+- Trả về datetime object hoặc None
+
+### 4.3. Extract Report Period
+- Tự động trích xuất kỳ báo cáo từ tiêu đề Excel
+- Pattern: "Từ ngày dd/mm/yyyy đến hết ngày dd/mm/yyyy"
+
+### 4.4. Identify Tasks với Subtasks
+- Sau khi parse xong, tự động đánh dấu task nào có subtask
+- Thêm field: hasSubtasks, subtaskCount, children[]
+
+## 5. YÊU CẦU PYTHON IMPLEMENTATION
+
+### 5.1. Kiến trúc
+- **KHÔNG dùng Class** - Sử dụng Functional Approach
+- Tách code thành các module riêng biệt:
+  * config/ - Cấu hình (MongoDB URI, formats, constants)
+  * utils/ - Parsers và validators
+  * database/ - Connection và CRUD operations
+  * extractors/ - Excel reader và task parser
+  * main.py - Entry point
+  * cli.py - Command line interface
+
+### 5.2. Core Functions Cần Có
+
+**utils/parsers.py:**
+- parse_stt(stt: str) -> (level, parent_stt)
+- parse_date(date_value) -> datetime
+- extract_report_period(title: str) -> dict
+- parse_cost(cost_str: str) -> float
+
+**database/connection.py:**
+- connect_mongodb(uri, db_name) -> (client, db)
+- close_mongodb(client)
+- test_connection() -> bool
+
+**database/operations.py:**
+- insert_employee(db, employee_data) -> dict
+- get_employee_by_code(db, code) -> dict
+- insert_work_report(db, report, auto_update) -> bool
+- get_reports_by_employee(db, code, year, month) -> list
+- get_reports_by_department(db, dept_code, year, month) -> list
+
+**extractors/excel_reader.py:**
+- load_excel_file(path) -> (workbook, sheet, title)
+- find_section_start_rows(sheet) -> dict
+
+**extractors/task_parser.py:**
+- parse_tasks_from_dataframe(df, task_type, prefix) -> list
+
+**main.py:**
+- extract_work_report_from_excel(path, employee) -> dict
+- import_single_report(db, path, employee_data) -> bool
+- import_batch_reports(db, excel_files, employees) -> None
+
+### 5.3. Features
+- Batch import từ nhiều file Excel
+- Validate dữ liệu trước khi insert
+- Xử lý duplicate (hỏi update hay skip)
+- History tracking (version, changes)
+- Error handling đầy đủ
+
+## 6. YÊU CẦU QUERY & AGGREGATION
+
+Cung cấp các query ví dụ cho:
+- Lấy báo cáo của nhân viên theo tháng
+- Lấy tất cả báo cáo của phòng ban
+- Tìm công việc trễ hạn
+- Tổng hợp công việc theo phòng ban (completion rate)
+- So sánh kế hoạch vs thực hiện
+- Phân tích xu hướng theo thời gian
+- Báo cáo chi phí theo dự án
+- Lấy tất cả subtask của một task
+
+## 7. YÊU CẦU OUTPUT
+
+### 7.1. Database Schema
+- Collections structure chi tiết với tất cả fields
+- Indexes configuration
+- Sample documents (3-4 examples cho mỗi collection)
+
+### 7.2. Python Code
+- Code structure đầy đủ, chia thành nhiều file
+- Mỗi function có docstring rõ ràng
+- Type hints cho tất cả parameters
+- Examples sử dụng trong docstring
+- Script generate_project.py để tạo toàn bộ structure
+
+### 7.3. Documentation
+- README.md với hướng dẫn đầy đủ
+- requirements.txt
+- .env.example
+- setup.py (optional)
+
+### 7.4. Additional Files
+- CLI tool với các commands: import-file, import-folder, list-reports, test-db
+- Validation functions
+- Configuration management
+
+## 8. RÀNG BUỘC KỸ THUẬT
+
+- Database: MongoDB
+- Python: 3.8+
+- Libraries: pymongo, pandas, openpyxl, python-dotenv
+- Hỗ trợ: 100-1000 nhân viên
+- Performance: Query < 2s
+- Lưu trữ: Tối thiểu 3 năm lịch sử
+
+## 9. BEST PRACTICES CẦN ÁP DỤNG
+
+- Separation of concerns (mỗi file một trách nhiệm)
+- DRY (Don't Repeat Yourself)
+- Error handling graceful
+- Logging cho debug
+- Validate input trước khi process
+- Connection pooling cho MongoDB
+- Reusable functions
+- Clear naming conventions
+
+## 10. EDGE CASES CẦN XỬ LÝ
+
+- File Excel thiếu sections
+- STT không theo format (vd: "a", "A1", rỗng)
+- Date format không chuẩn
+- Task có parentTaskId nhưng parent không tồn tại
+- Duplicate report code
+- Employee chưa tồn tại trong DB
+- Empty tasks list
+- Chi phí âm hoặc không hợp lệ
+
+Hãy cung cấp:
+1. Complete MongoDB schema với indexes
+2. Python code structure đầy đủ (functional approach, chia nhiều file)
+3. Sample queries và aggregation pipelines
+4. README với hướng dẫn sử dụng chi tiết
+5. Script tự động generate project structure
+
+Đảm bảo code dễ hiểu, dễ maintain và scalable.
