@@ -19,7 +19,9 @@ def parse_tasks_from_dataframe(df: pd.DataFrame, task_type: str = "actual", pref
     tasks = []
     task_id_counter = 1
     stt_to_task_id = {}
-    
+    print(df.columns)
+    df.to_csv("output.csv", index=False, encoding='utf-16') 
+    print(len(df))
     # Pass 1: Parse tất cả tasks
     for idx, row in df.iterrows():
         if pd.isna(row.get('Công việc', '')) or str(row.get('Công việc', '')).strip() == '':
@@ -27,7 +29,8 @@ def parse_tasks_from_dataframe(df: pd.DataFrame, task_type: str = "actual", pref
         
         stt = str(row.get('Stt', '')).strip()
         level, parent_stt = parse_stt(stt)
-        
+        # print(level, parent_stt)
+        # break
         task_id = f"{prefix}{task_id_counter:03d}"
         task_id_counter += 1
         
@@ -61,7 +64,7 @@ def parse_tasks_from_dataframe(df: pd.DataFrame, task_type: str = "actual", pref
             task["costUnit"] = DEFAULT_COST_UNIT
         
         tasks.append(task)
-    
+
     # Pass 2: Update hasSubtasks
     for task in tasks:
         if task['parentTaskId']:

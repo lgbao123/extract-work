@@ -23,9 +23,13 @@ DATE_FORMATS = [
 
 # Excel Configuration
 EXCEL_SECTION_KEYWORDS = {
+    "actual": "A. Thực hiện công việc tháng",
     "actual_functional": "CÔNG VIỆC THEO CHỨC NĂNG",
     "actual_project": "CÔNG VIỆC THAM GIA CÁC DỰ ÁN",
-    "planned_functional": "KẾ HOẠCH CÔNG VIỆC",
+    "actual_review": "ĐÁNH GIÁ CHUNG",
+    "planned": "B. Kế hoạch công việc tháng tiếp theo",
+    "planned_functional": "CÔNG VIỆC THEO CHỨC NĂNG",
+    "planned_project": "CÔNG VIỆC THAM GIA CÁC DỰ ÁN",
 }
 
 # Default values
