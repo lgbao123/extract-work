@@ -5,7 +5,7 @@ import pandas as pd
 
 # Import các module
 from config.settings import DEFAULT_REPORT_STATUS
-from database.connection import connect_mongodb, close_mongodb
+from database.connection import connect_google_sheets, get_worksheet
 from database.operations import insert_employee, insert_work_report
 from extractors.excel_reader import load_excel_file, find_section_start_rows
 from extractors.task_parser import parse_tasks_from_dataframe
@@ -166,7 +166,7 @@ def extract_work_report_from_excel(excel_path: str,sheet_name:str, employee_info
     return 
 
 
-def import_single_report(db, excel_path: str, employee_data: Dict):
+def import_single_report(spreadsheet, excel_path: str, employee_data: Dict):
     """Import một báo cáo"""
     # Validate
     is_valid, error = validate_employee_data(employee_data)
@@ -175,7 +175,7 @@ def import_single_report(db, excel_path: str, employee_data: Dict):
         return False
     
     # Insert employee
-    employee = insert_employee(db, employee_data)
+    employee = insert_employee(spreadsheet, employee_data)
     
     # Extract report
     work_report = extract_work_report_from_excel(excel_path, employee)
@@ -187,10 +187,10 @@ def import_single_report(db, excel_path: str, employee_data: Dict):
         return False
     
     # Insert report
-    return insert_work_report(db, work_report)
+    return insert_work_report(spreadsheet, work_report)
 
 
-def import_batch_reports(db, excel_files: List[str], employees: List[Dict]):
+def import_batch_reports(spreadsheet, excel_files: List[str], employees: List[Dict]):
     """Import nhiều báo cáo"""
     if len(excel_files) != len(employees):
         raise ValueError("Số lượng file và nhân viên phải bằng nhau")
@@ -202,7 +202,7 @@ def import_batch_reports(db, excel_files: List[str], employees: List[Dict]):
     
     for excel_file, employee_data in zip(excel_files, employees):
         try:
-            if import_single_report(db, excel_file, employee_data):
+            if import_single_report(spreadsheet, excel_file, employee_data):
                 success += 1
             else:
                 failed += 1
@@ -215,8 +215,8 @@ def import_batch_reports(db, excel_files: List[str], employees: List[Dict]):
 
 def main():
     """Entry point"""
-    # Kết nối DB
-    client, db = connect_mongodb()
+    # Kết nối Google Sheets
+    client, spreadsheet = connect_google_sheets()
     
     try:
         # Dữ liệu mẫu
@@ -224,23 +224,22 @@ def main():
             "employeeCode": "NV001",
             "fullName": "Nguyễn Khắc Trung",
             "email": "trung@company.com",
-            "department": {"code": "IT", "name": "Phòng CNTT"},
-            "position": {"code": "LEADER", "name": "Trưởng nhóm"},
-            "status": "active",
-            "createdAt": datetime.now(),
-            "updatedAt": datetime.now()
+            "departmentCode": "IT",
+            "departmentName": "Phòng CNTT",
+            "position": "Trưởng nhóm",
+            "managerCode": "",
         }
         
         excel_files = ["reports/baocao_NV001.xlsx"]
         
         # Import một file
-        import_single_report(db, excel_files[0], employee)
+        import_single_report(spreadsheet, excel_files[0], employee)
         
         # Hoặc import nhiều file
-        # import_batch_reports(db, excel_files, [employee])
+        # import_batch_reports(spreadsheet, excel_files, [employee])
         
     finally:
-        close_mongodb(client)
+        print("\\n✓ Hoàn tất")
 
 
 if __name__ == "__main__":

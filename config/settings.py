@@ -3,15 +3,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# MongoDB Configuration
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-DATABASE_NAME = os.getenv("DATABASE_NAME", "work_report_db")
+# Google Sheets Configuration
+GOOGLE_SHEETS_CREDENTIALS_FILE = os.getenv("GOOGLE_SHEETS_CREDENTIALS_FILE", "credentials.json")
+GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "")
+GOOGLE_SHEETS_SPREADSHEET_NAME = os.getenv("GOOGLE_SHEETS_SPREADSHEET_NAME", "Work Report Database")
 
-# Collections
-COLLECTION_EMPLOYEES = "employees"
-COLLECTION_WORK_REPORTS = "work_reports"
-COLLECTION_PROJECTS = "projects"
-COLLECTION_TASK_TYPES = "task_types"
+# Sheet Names (tabs in Google Sheets)
+SHEET_EMPLOYEES = "Employees"
+SHEET_WORK_REPORTS = "Work_Reports"
+SHEET_TASKS_ACTUAL = "Tasks_Actual"
+SHEET_TASKS_PLANNED = "Tasks_Planned"
+SHEET_REVIEWS = "Reviews"
 
 # Date Formats
 DATE_FORMATS = [
