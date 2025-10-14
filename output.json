@@ -1,0 +1,35 @@
+[
+    {
+        "taskId": "T001",
+        "stt": "1",
+        "parentTaskId": null,
+        "level": 0,
+        "taskName": "V\u1eadn h\u00e0nh h\u1ec7 th\u1ed1ng ph\u1ea7n m\u1ec1m",
+        "taskType": "K\u1ebf ho\u1ea1ch",
+        "startDate": null,
+        "endDate": null,
+        "description": "",
+        "solution": "",
+        "notes": "",
+        "hasSubtasks": true,
+        "subtaskCount": 5,
+        "children": [
+            "T002",
+            "T003",
+            "T004",
+            "T005",
+            "T006"
+        ],
+        "evaluation": "Ho\u00e0n th\u00e0nh",
+        "actualStartDate": null,
+        "actualEndDate": null,
+        "completionRate": 100
+    },
+    {
+        "taskId": "T002",
+        "stt": "1.1",
+        "parentTaskId": "T001",
+        "level": 1,
+        "taskName": "X\u00f3a d\u1eef li\u1ec7u chuy\u1ebfn t\u00e0u nh\u1eadp nh\u1ea7m k\u1ebf ho\u1ea1ch tr\u00ean ph\u1ea7n m\u1ec1m Client cho C\u1ea3ng LBT",
+        "taskType": "\u0110\u1ed9t xu\u1ea5t",
+        "startDate": 

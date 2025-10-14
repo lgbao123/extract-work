@@ -65,65 +65,69 @@ def extract_work_report_from_excel(excel_path: str,sheet_name:str, employee_info
         df = flatten_multiindex_columns(df)
         
         actual_functional_tasks = parse_tasks_from_dataframe(df, "actual", "T")
-        print(f"  ✓ {len(actual_functional_tasks)} công việc chức năng")
+        print(f"------ Hiện tại: {len(actual_functional_tasks)} công việc chức năng")
     
-    # if sections['actual_project']:
-    #     end_row = sections['actual_review'] - 1 if sections['actual_review'] else (sections['planned'] - 1 if sections['planned'] else sheet.max_row)
-    #     # Section 1: Same headers as actual_functional (rows 6-7), but project data starts from actual_project row
-    #     header_start_row = 6  # Same headers as functional section
-    #     project_data_start = sections['actual_project'] + 1  # Data starts after project section header
+    if sections['actual_project']:
+        end_row = sections['actual_review'] - 1 if sections['actual_review'] else (sections['planned'] - 1 if sections['planned'] else sheet.max_row)
+        # Section 1: Same headers as actual_functional (rows 6-7), but project data starts from actual_project row
+        header_start_row = 6  # Same headers as functional section
+
+        # Read the project section with same headers (6,7) but different data range
+        df = pd.read_excel(excel_path, sheet_name=sheet_name,
+                          skiprows=list(range(0, header_start_row)),
+                          header=[0, 1],  # Use rows 6,7 as multi-level header
+                          nrows=end_row - (header_start_row+2) + 1)  # Read project data range
+        # Drop the first row after headers (row 8), keep data from row 9+
+        row_start = sections["actual_project"]- sections["actual_functional"] + 1
+        df = df.iloc[row_start:,:]  # Skip row 8, keep data from row 9+
         
-    #     # Read the project section with same headers (6,7) but different data range
-    #     df = pd.read_excel(excel_path, sheet_name=sheet_name,
-    #                       skiprows=list(range(0, header_start_row - 1)) + list(range(header_start_row + 2, project_data_start)),
-    #                       header=[0, 1],  # Use rows 6,7 as multi-level header
-    #                       nrows=end_row - project_data_start + 1)  # Read project data range
+        # Flatten multi-level headers into single level
+        df = flatten_multiindex_columns(df)
         
-    #     # Flatten multi-level headers into single level
-    #     df = flatten_multiindex_columns(df)
-        
-    #     actual_project_tasks = parse_tasks_from_dataframe(df, "actual", "P")
-    #     print(f"  ✓ {len(actual_project_tasks)} công việc dự án")
+        actual_project_tasks = parse_tasks_from_dataframe(df, "actual", "P")
+        print(f"------ Hiện tại: {len(actual_project_tasks)} công việc dự án")
     
-    # print("  → Đang extract Phần B: Kế hoạch công việc...")
+    print("  → Đang extract Phần B: Kế hoạch công việc...")
     
-    # if sections['planned_functional']:
-    #     end_row = sections['planned_project'] - 1 if sections['planned_project'] else sheet.max_row
-    #     # Section 2: Headers at rows 83-84, planned_functional data from row 86
-    #     planned_header_start = 83  # Row 83 (first header row for Section 2)
+    if sections['planned_functional']:
+        end_row = sections['planned_project'] - 1 if sections['planned_project'] else sheet.max_row
+        # Section 2: Headers at rows 83-84, planned_functional data from row 86
+        planned_header_start = 83  # Row 83 (first header row for Section 2)
         
-    #     # Skip rows before planned headers, read headers (83,84) + data from row 86
-    #     df = pd.read_excel(excel_path, sheet_name=sheet_name,
-    #                       skiprows=list(range(0, planned_header_start - 1)),  # Skip rows 1-82
-    #                       header=[0, 1],  # Use rows 83,84 as multi-level header
-    #                       nrows=end_row - planned_header_start + 1)  # Read from row 83 to end_row
+        # Skip rows before planned headers, read headers (83,84) + data from row 86
+        df = pd.read_excel(excel_path, sheet_name=sheet_name,
+                          skiprows=list(range(0, planned_header_start)),  # Skip rows 1-82
+                          header=[0, 1],  # Use rows 83,84 as multi-level header
+                          nrows=end_row - (planned_header_start+2) + 1)  # Read from row 83 to end_row
         
-    #     # Drop the first row after headers (row 85), keep data from row 86+
-    #     df = df.iloc[1:]  # Skip row 85, keep data from row 86+
+        # Drop the first row after headers (row 85), keep data from row 86+
+        df = df.iloc[1:]  # Skip row 85, keep data from row 86+
         
-    #     # Flatten multi-level headers into single level
-    #     df = flatten_multiindex_columns(df)
+        # Flatten multi-level headers into single level
+        df = flatten_multiindex_columns(df)
         
-    #     planned_functional_tasks = parse_tasks_from_dataframe(df, "planned", "PT")
-    #     print(f"  ✓ {len(planned_functional_tasks)} công việc kế hoạch")
+        planned_functional_tasks = parse_tasks_from_dataframe(df, "planned", "PT")
+        print(f"------ Kế hoạch: {len(planned_functional_tasks)} công việc theo chức năng ")
     
-    # if sections['planned_project']:
-    #     end_row = sheet.max_row
-    #     # Section 2: Same headers as planned_functional (rows 83-84), but project data starts from planned_project row
-    #     planned_header_start = 83  # Same headers as functional section
-    #     project_data_start = sections['planned_project'] + 1  # Data starts after project section header
+    if sections['planned_project']:
+        end_row = sheet.max_row
+        # Section 2: Same headers as planned_functional (rows 83-84), but project data starts from planned_project row
+        planned_header_start = 83  # Same headers as functional section
+
+        # Read the project section with same headers (83,84) but different data range
+        df = pd.read_excel(excel_path, sheet_name=sheet_name,
+                          skiprows=list(range(0, planned_header_start )),
+                          header=[0, 1],  # Use rows 83,84 as multi-level header
+                          nrows= end_row - (planned_header_start+2) + 1)  # Read project data range
         
-    #     # Read the project section with same headers (83,84) but different data range
-    #     df = pd.read_excel(excel_path, sheet_name=sheet_name,
-    #                       skiprows=list(range(0, planned_header_start - 1)) + list(range(planned_header_start + 2, project_data_start)),
-    #                       header=[0, 1],  # Use rows 83,84 as multi-level header
-    #                       nrows=end_row - project_data_start + 1)  # Read project data range
+        row_start = sections["planned_project"]- sections["planned_functional"] + 1
+        df = df.iloc[row_start:,:]  # Skip row 8, keep data from row 9+
         
-    #     # Flatten multi-level headers into single level
-    #     df = flatten_multiindex_columns(df)
+        # Flatten multi-level headers into single level
+        df = flatten_multiindex_columns(df)
         
-    #     planned_project_tasks = parse_tasks_from_dataframe(df, "planned", "P")
-    #     print(f"  ✓ {len(planned_project_tasks)} công việc dự án kế hoạch")
+        planned_project_tasks = parse_tasks_from_dataframe(df, "planned", "P")
+        print(f"------ Kế hoạch: {len(planned_project_tasks)} công việc dự án kế hoạch")
     
     # Tạo work report
     # work_report = {
