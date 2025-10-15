@@ -89,12 +89,12 @@ def initialize_sheets(spreadsheet):
         ],
         SHEET_TASKS_ACTUAL: [
             "taskId", "reportCode", "stt", "taskName", "taskType", "category",
-            "startDate", "endDate", "description", "solution", "evaluation",
+            "frequency", "startDate", "endDate",  "result", "challenges", "evaluation",
             "level", "parentTaskId", "hasSubtasks", "subtaskCount", "createdAt"
         ],
         SHEET_TASKS_PLANNED: [
             "taskId", "reportCode", "stt", "taskName", "taskType", "category",
-            "startDate", "endDate", "description", "solution", "cost", "costUnit",
+            "frequency","startDate", "endDate", "desc", "cost", "costUnit",
             "level", "parentTaskId", "hasSubtasks", "subtaskCount", "createdAt"
         ],
         SHEET_REVIEWS: [

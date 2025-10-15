@@ -1,3 +1,4 @@
+import datetime
 import pandas as pd
 def flatten_multiindex_columns(df):
     """
@@ -29,3 +30,14 @@ def flatten_multiindex_columns(df):
             new_columns.append(combined)
         df.columns = new_columns
     return df
+
+
+# Convert datetime objects to ISO format strings for JSON serialization
+def convert_datetime(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {k: convert_datetime(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [convert_datetime(i) for i in obj]
+    return obj

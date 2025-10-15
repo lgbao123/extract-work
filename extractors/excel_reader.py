@@ -66,6 +66,7 @@ def find_section_start_rows(sheet) -> Dict[str, int]:
         if EXCEL_SECTION_KEYWORDS["actual_review"].upper() in combined_text:
             if in_actual_section and sections['actual_review'] is None:
                 sections['actual_review'] = row_idx 
+    # print(sections)
     return sections
 
 

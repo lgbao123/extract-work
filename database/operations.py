@@ -171,7 +171,6 @@ def insert_work_report(spreadsheet, work_report: Dict, auto_update: bool = False
             new_row = pd.DataFrame([report_info])
             df = pd.concat([df, new_row], ignore_index=True)
             set_with_dataframe(worksheet, df)
-            
             # Thêm tasks
             _insert_tasks(spreadsheet, work_report)
             
@@ -215,7 +214,8 @@ def _insert_tasks(spreadsheet, work_report: Dict):
             new_tasks = pd.DataFrame(actual_tasks)
             df = pd.concat([df, new_tasks], ignore_index=True)
             set_with_dataframe(worksheet, df)
-    
+            print(new_tasks.columns.to_list())
+
     # Insert planned tasks
     if 'plannedWork' in work_report:
         planned_tasks = []
@@ -266,6 +266,9 @@ def _update_tasks(spreadsheet, work_report: Dict):
 
 def _prepare_task_data(task: Dict, report_code: str, category: str, is_planned: bool = False) -> Dict:
     """Chuẩn bị dữ liệu task để insert vào sheet"""
+    # Convert children array to comma-separated string for storage
+    # children_str = ','.join(task.get('children', [])) if task.get('children') else ''
+    
     task_data = {
         'taskId': task.get('taskId', str(uuid.uuid4())),
         'reportCode': report_code,
@@ -273,22 +276,31 @@ def _prepare_task_data(task: Dict, report_code: str, category: str, is_planned: 
         'taskName': task.get('taskName', ''),
         'taskType': task.get('taskType', ''),
         'category': category,
+        'frequency': task.get('frequency', ''),
         'startDate': task.get('startDate', ''),
         'endDate': task.get('endDate', ''),
+        'result': task.get('result', ''),
         'description': task.get('description', ''),
-        'solution': task.get('solution', ''),
+        # 'solution': task.get('solution', ''),
+        # 'notes': task.get('notes', ''),
         'level': task.get('level', 0),
         'parentTaskId': task.get('parentTaskId', ''),
         'hasSubtasks': task.get('hasSubtasks', False),
         'subtaskCount': task.get('subtaskCount', 0),
+        # 'children': children_str,
         'createdAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
     if is_planned:
-        task_data['cost'] = task.get('cost', 0)
+        # For planned tasks
+        task_data['estimatedCost'] = task.get('estimatedCost', 0)
         task_data['costUnit'] = task.get('costUnit', 'VND')
-    else:
-        task_data['evaluation'] = task.get('evaluation', '')
+    # else:
+        # For actual tasks
+        # task_data['evaluation'] = task.get('evaluation', '')
+        # task_data['actualStartDate'] = task.get('actualStartDate', '')
+        # task_data['actualEndDate'] = task.get('actualEndDate', '')
+        # task_data['completionRate'] = task.get('completionRate', 0)
     
     return task_data
 
