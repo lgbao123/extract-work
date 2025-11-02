@@ -1,0 +1,70 @@
+Generate Complete Folder Structure With:
+
+Root Level Files:
+
+main.py - Application entry point
+requirements.txt - Python dependencies
+.env.example - Environment variable template
+.gitignore - Python/IDE ignores
+README.md - Setup and usage documentation
+setup.py or pyproject.toml - Package configuration
+
+
+config/ - Configuration Management
+
+__init__.py
+settings.py - Load environment variables, Google Sheets config
+constants.py - Sheet names, column mappings, status enums
+logging_config.py - Logging setup
+
+
+models/ - Data Models (Dataclasses)
+
+__init__.py
+base.py - Base model with common fields (created_at, updated_at)
+employee.py - Employee data model
+department.py - Department data model
+report.py - WorkReport data model
+task.py - Task data model (for both actual and planned)
+review.py - Review/evaluation data model
+
+
+parsers/ - File Parsing Layer
+
+__init__.py
+base_parser.py - Abstract base parser class
+csv_parser.py - CSV parsing implementation
+excel_parser.py - Excel parsing (optional, for future)
+validators.py - Data validation rules
+transformers.py - Data transformation utilities
+
+
+repositories/ - Data Access Layer
+
+__init__.py
+base_repository.py - Abstract CRUD operations
+google_sheets_client.py - Google Sheets API wrapper
+employee_repository.py - Employee CRUD
+department_repository.py - Department CRUD
+report_repository.py - Report CRUD
+task_repository.py - Task CRUD
+
+
+services/ - Business Logic Layer
+
+__init__.py
+report_service.py - Report processing orchestration
+task_service.py - Task processing logic
+validation_service.py - Cross-entity validation
+notification_service.py - Email/alerts (optional)
+analytics_service.py - Data aggregation for dashboard
+
+
+utils/ - Shared Utilities
+
+__init__.py
+date_helper.py - Date parsing and formatting
+string_helper.py - String cleaning utilities
+logger.py - Custom logger wrapper
+exceptions.py - Custom exception classes
+decorators.py - Common decorators (retry, timing, etc.)

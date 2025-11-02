@@ -1,0 +1,7 @@
+# Google Sheets Configuration
+GOOGLE_SHEETS_CREDENTIALS_FILE=./credentials.json
+GOOGLE_SHEETS_SPREADSHEET_ID=1Lh8LQ11ox1pZKciJs_H8xgCeMW8oGgIHvnSwJFwI2tQ
+GOOGLE_SHEETS_SPREADSHEET_NAME=Work_Report_Database
+
+# Optional: If using spreadsheet name instead of ID
+# Leave SPREADSHEET_ID empty if using name

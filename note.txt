@@ -1,7 +1,7 @@
 pip install pandas numpy openpyxl xlsxwriter gspread gspread_dataframe oauth2client
 
 
-Đây là báo cáo công việc của 1 nhân viên . Tôi muốn thiết kế database (nosql) để sao này có thể quản lý tổng hợp từ nhiều người và làm dashboard 
+Đây là báo cáo công việc của 1 nhân viên . Tôi muốn thiết kế database (gooole sheet) để sao này có thể quản lý tổng hợp từ nhiều người và làm dashboard 
 cấu trúc file gốc báo cáo bao gồm:
 A. Thực hiện công việc tháng hien tai (Từ ngày 20/08/2025 đến hết ngày 20/09/2025)
 I. Công việc theo chức năng vị trí

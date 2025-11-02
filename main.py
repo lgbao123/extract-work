@@ -1,250 +1,297 @@
+"""
+Main Entry Point - Work Report Processing System
+
+Uses clean architecture with services, repositories, and parsers
+"""
+
 import sys
-from datetime import datetime
-from typing import List, Dict
-import pandas as pd
+import argparse
+from pathlib import Path
+from typing import List, Dict, Optional
 
-# Import các module
-from config.settings import DEFAULT_REPORT_STATUS
-from database.connection import connect_mongodb, close_mongodb
-from database.operations import insert_employee, insert_work_report
-from extractors.excel_reader import load_excel_file, find_section_start_rows
-from extractors.task_parser import parse_tasks_from_dataframe
-from utils.parsers import extract_report_period
-from utils.validators import validate_employee_data, validate_work_report
-from utils.features import flatten_multiindex_columns
+# Import new architecture modules
+from config import Settings, setup_logging
+from repositories import GoogleSheetsClient, EmployeeRepository, DepartmentRepository, ReportRepository
+from services import ReportService, TaskService, ValidationService
+from utils import get_logger
+
+logger = get_logger(__name__)
 
 
-
-def extract_work_report_from_excel(excel_path: str,sheet_name:str, employee_info: Dict) -> Dict:
+def import_single_report(report_service: ReportService,
+                        excel_path: str,
+                        employee_code: str,
+                        department_code: str,
+                        auto_update: bool = False) -> Optional[Dict]:
     """
-    Extract báo cáo công việc từ file Excel
+    Import a single report from Excel file
     
     Args:
-        excel_path: Đường dẫn file Excel
-        employee_info: Thông tin nhân viên
+        report_service: Report service instance
+        excel_path: Path to Excel file
+        employee_code: Employee code
+        department_code: Department code
+        auto_update: Whether to update existing report
         
     Returns:
-        Dict work report
+        Dictionary with import results or None if failed
     """
-    print(f"\\n📄 Đang xử lý file: {excel_path}")
+    logger.info(f"Importing report: {excel_path}")
+    print(f"\\n📄 Processing file: {excel_path}")
     
-    # Load Excel
-    wb, sheet, title = load_excel_file(excel_path,sheet_name)
-    
-    # Extract report period
-    report_period = extract_report_period(title)
-    report_code = f"BC-{report_period['year']}-{report_period['month']:02d}-{employee_info['employeeCode']}"
-    
-    # Tìm vị trí sections
-    sections = find_section_start_rows(sheet)
-    
-    # Parse tasks
-    actual_functional_tasks = []
-    actual_project_tasks = []
-    planned_functional_tasks = []
-    planned_project_tasks = []
-    
-    # print(wb, sheet, title)
-    print("  → Đang extract Phần A: Thực hiện công việc...")
-    
-    if sections['actual_functional']:
-        end_row = sections['actual_project'] - 1 if sections['actual_project'] else sheet.max_row
-        # Section 1: Headers at rows 6-7, actual_functional data from row 9
-        header_start_row = 6  # Row 6 (first header row for Section 1)
+    try:
+        excel_path = "./input/202509_Bao cao cong viec_thinhdv.xlsx"
+        employee_code = "NV001"
+        department_code = "IT"
+        auto_update = False
         
-        # Skip rows 1-5, read headers (6,7) + data from row 9 to actual_project
-        df = pd.read_excel(excel_path, sheet_name=sheet_name,
-                          skiprows=list(range(0, header_start_row)),  # Skip rows 1-5
-                          header=[0, 1],  # Use rows 6,7 as multi-level header
-                          nrows=end_row - (header_start_row +2) + 1)  # Read from row 6 to end_row
+        result = report_service.import_from_excel(
+            file_path=excel_path,
+            employee_code=employee_code,
+            department_code=department_code,
+            auto_update=auto_update
+        )
         
-        # Drop the first row after headers (row 8), keep data from row 9+
-        df = df.iloc[1:]  # Skip row 8, keep data from row 9+
+        print(f"✓ Success: {result['action']} report {result['report_code']}")
+        print(f"  → Period: {result['period']}")
+        print(f"  → Total tasks: {result['total_tasks']}")
+        print(f"  → Task breakdown:")
+        for task_type, count in result['task_counts'].items():
+            print(f"    - {task_type}: {count}")
         
-        # Flatten multi-level headers into single level
-        df = flatten_multiindex_columns(df)
+        return result
         
-        actual_functional_tasks = parse_tasks_from_dataframe(df, "actual", "T")
-        print(f"------ Hiện tại: {len(actual_functional_tasks)} công việc chức năng")
-    
-    if sections['actual_project']:
-        end_row = sections['actual_review'] - 1 if sections['actual_review'] else (sections['planned'] - 1 if sections['planned'] else sheet.max_row)
-        # Section 1: Same headers as actual_functional (rows 6-7), but project data starts from actual_project row
-        header_start_row = 6  # Same headers as functional section
-
-        # Read the project section with same headers (6,7) but different data range
-        df = pd.read_excel(excel_path, sheet_name=sheet_name,
-                          skiprows=list(range(0, header_start_row)),
-                          header=[0, 1],  # Use rows 6,7 as multi-level header
-                          nrows=end_row - (header_start_row+2) + 1)  # Read project data range
-        # Drop the first row after headers (row 8), keep data from row 9+
-        row_start = sections["actual_project"]- sections["actual_functional"] + 1
-        df = df.iloc[row_start:,:]  # Skip row 8, keep data from row 9+
-        
-        # Flatten multi-level headers into single level
-        df = flatten_multiindex_columns(df)
-        
-        actual_project_tasks = parse_tasks_from_dataframe(df, "actual", "P")
-        print(f"------ Hiện tại: {len(actual_project_tasks)} công việc dự án")
-    
-    print("  → Đang extract Phần B: Kế hoạch công việc...")
-    
-    if sections['planned_functional']:
-        end_row = sections['planned_project'] - 1 if sections['planned_project'] else sheet.max_row
-        # Section 2: Headers at rows 83-84, planned_functional data from row 86
-        planned_header_start = 83  # Row 83 (first header row for Section 2)
-        
-        # Skip rows before planned headers, read headers (83,84) + data from row 86
-        df = pd.read_excel(excel_path, sheet_name=sheet_name,
-                          skiprows=list(range(0, planned_header_start)),  # Skip rows 1-82
-                          header=[0, 1],  # Use rows 83,84 as multi-level header
-                          nrows=end_row - (planned_header_start+2) + 1)  # Read from row 83 to end_row
-        
-        # Drop the first row after headers (row 85), keep data from row 86+
-        df = df.iloc[1:]  # Skip row 85, keep data from row 86+
-        
-        # Flatten multi-level headers into single level
-        df = flatten_multiindex_columns(df)
-        
-        planned_functional_tasks = parse_tasks_from_dataframe(df, "planned", "PT")
-        print(f"------ Kế hoạch: {len(planned_functional_tasks)} công việc theo chức năng ")
-    
-    if sections['planned_project']:
-        end_row = sheet.max_row
-        # Section 2: Same headers as planned_functional (rows 83-84), but project data starts from planned_project row
-        planned_header_start = 83  # Same headers as functional section
-
-        # Read the project section with same headers (83,84) but different data range
-        df = pd.read_excel(excel_path, sheet_name=sheet_name,
-                          skiprows=list(range(0, planned_header_start )),
-                          header=[0, 1],  # Use rows 83,84 as multi-level header
-                          nrows= end_row - (planned_header_start+2) + 1)  # Read project data range
-        
-        row_start = sections["planned_project"]- sections["planned_functional"] + 1
-        df = df.iloc[row_start:,:]  # Skip row 8, keep data from row 9+
-        
-        # Flatten multi-level headers into single level
-        df = flatten_multiindex_columns(df)
-        
-        planned_project_tasks = parse_tasks_from_dataframe(df, "planned", "P")
-        print(f"------ Kế hoạch: {len(planned_project_tasks)} công việc dự án kế hoạch")
-    
-    # Tạo work report
-    # work_report = {
-    #     "reportCode": report_code,
-    #     # "employeeId": employee_info.get("_id"),
-    #     # "employeeCode": employee_info["employeeCode"],
-    #     # "employeeName": employee_info["fullName"],
-    #     # "department": employee_info["department"],
-    #     "reportPeriod": report_period,
-    #     "actualWork": {
-    #         "functionalTasks": actual_functional_tasks,
-    #         "projectTasks": actual_project_tasks,
-    #         "generalEvaluation": {"dailyWork": "", "professionalWork": ""}
-    #     },
-    #     "plannedWork": {
-    #         "functionalTasks": planned_functional_tasks,
-    #         "projectTasks": []
-    #     },
-    #     "status": DEFAULT_REPORT_STATUS,
-    #     "submittedAt": None,
-    #     "approvedBy": None,
-    #     "approvedAt": None,
-    #     "version": 1,
-    #     "createdAt": datetime.now(),
-    #     "updatedAt": datetime.now(),
-    #     "history": [{
-    #         "version": 1,
-    #         "action": "imported",
-    #         "changedBy": employee_info.get("_id"),
-    #         "changedAt": datetime.now(),
-    #         "changes": {}
-    #     }]
-    # }
-    
-    wb.close()
-    return 
+    except Exception as e:
+        logger.error(f"Failed to import report: {e}")
+        print(f"✗ Error: {e}")
+        return None
 
 
-def import_single_report(db, excel_path: str, employee_data: Dict):
-    """Import một báo cáo"""
-    # Validate
-    is_valid, error = validate_employee_data(employee_data)
-    if not is_valid:
-        print(f"✗ Dữ liệu nhân viên không hợp lệ: {error}")
-        return False
+def import_batch_reports(report_service: ReportService,
+                        excel_files: List[str],
+                        employee_codes: List[str],
+                        department_codes: List[str],
+                        auto_update: bool = False):
+    """
+    Import multiple reports
     
-    # Insert employee
-    employee = insert_employee(db, employee_data)
+    Args:
+        report_service: Report service instance
+        excel_files: List of Excel file paths
+        employee_codes: List of employee codes
+        department_codes: List of department codes
+        auto_update: Whether to update existing reports
+    """
+    if not (len(excel_files) == len(employee_codes) == len(department_codes)):
+        print("✗ Error: Number of files, employees, and departments must match")
+        return
     
-    # Extract report
-    work_report = extract_work_report_from_excel(excel_path, employee)
-    
-    # Validate report
-    is_valid, error = validate_work_report(work_report)
-    if not is_valid:
-        print(f"✗ Dữ liệu báo cáo không hợp lệ: {error}")
-        return False
-    
-    # Insert report
-    return insert_work_report(db, work_report)
-
-
-def import_batch_reports(db, excel_files: List[str], employees: List[Dict]):
-    """Import nhiều báo cáo"""
-    if len(excel_files) != len(employees):
-        raise ValueError("Số lượng file và nhân viên phải bằng nhau")
-    
-    print(f"\\n🚀 Bắt đầu import {len(excel_files)} báo cáo...")
+    print(f"\\n🚀 Starting batch import of {len(excel_files)} reports...")
     
     success = 0
     failed = 0
+    results = []
     
-    for excel_file, employee_data in zip(excel_files, employees):
-        try:
-            if import_single_report(db, excel_file, employee_data):
-                success += 1
-            else:
-                failed += 1
-        except Exception as e:
-            print(f"✗ Lỗi: {e}")
+    for excel_file, emp_code, dept_code in zip(excel_files, employee_codes, department_codes):
+        result = import_single_report(
+            report_service,
+            excel_file,
+            emp_code,
+            dept_code,
+            auto_update
+        )
+        
+        if result:
+            success += 1
+            results.append(result)
+        else:
             failed += 1
     
-    print(f"\\n📊 Kết quả: ✓ {success} thành công, ✗ {failed} thất bại")
+    print(f"\\n📊 Results: ✓ {success} successful, ✗ {failed} failed")
+    return results
+
+
+def view_report_summary(report_service: ReportService, report_code: str):
+    """View summary of a report"""
+    print(f"\\n📋 Report Summary: {report_code}")
+    
+    summary = report_service.get_report_summary(report_code)
+    
+    if not summary:
+        print(f"✗ Report not found: {report_code}")
+        return
+    
+    report = summary['report']
+    counts = summary['task_counts']
+    
+    print(f"\\nEmployee: {report['employee_name']} ({report['employee_code']})")
+    print(f"Period: {report['period']['year']}-{report['period']['month']:02d}")
+    print(f"Status: {report['status']}")
+    print(f"Version: {report['version']}")
+    
+    print(f"\\nTask Counts:")
+    print(f"  Actual Functional: {counts['actual_functional']}")
+    print(f"  Actual Project: {counts['actual_project']}")
+    print(f"  Planned Functional: {counts['planned_functional']}")
+    print(f"  Planned Project: {counts['planned_project']}")
+    print(f"  Has Review: {'Yes' if summary['has_review'] else 'No'}")
+
+
+def run_validation(client: GoogleSheetsClient):
+    """Run validation checks on all data"""
+    print("\\n🔍 Running validation checks...")
+    
+    validation_service = ValidationService(
+        EmployeeRepository(client),
+        DepartmentRepository(client),
+        ReportRepository(client)
+    )
+    
+    report = validation_service.get_validation_report()
+    
+    print(f"\\n📊 Validation Summary:")
+    print(f"  Total Issues: {report['summary']['total_issues']}")
+    print(f"  Orphaned Employees: {report['summary']['orphaned_employees_count']}")
+    print(f"  Empty Departments: {report['summary']['empty_departments_count']}")
+    print(f"  Duplicate Reports: {report['summary']['duplicate_reports_count']}")
+    
+    if report['summary']['total_issues'] > 0:
+        print(f"\\n⚠️  Issues Found:")
+        
+        for orphan in report['issues']['orphaned_employees']:
+            print(f"  - Employee {orphan['employee_code']} references non-existent department {orphan['department_code']}")
+        
+        for dept in report['issues']['empty_departments']:
+            print(f"  - Department {dept} has no employees")
+        
+        for dup in report['issues']['duplicate_reports']:
+            print(f"  - Duplicate report for {dup['employee_code']} in {dup['period']}")
+
+
+def create_cli_parser() -> argparse.ArgumentParser:
+    """Create command-line argument parser"""
+    parser = argparse.ArgumentParser(
+        description="Work Report Processing System",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Import a single report
+  python main.py import --file report.xlsx --employee NV001 --department IT
+  
+  # Import with auto-update
+  python main.py import --file report.xlsx --employee NV001 --department IT --auto-update
+  
+  # View report summary
+  python main.py view --report RPT-NV001-202409
+  
+  # Run validation
+  python main.py validate
+        """
+    )
+    
+    subparsers = parser.add_subparsers(dest='command', help='Command to execute')
+    
+    # Import command
+    import_parser = subparsers.add_parser('import', help='Import report from Excel')
+    import_parser.add_argument('--file', '-f', required=True, help='Excel file path')
+    import_parser.add_argument('--employee', '-e', required=True, help='Employee code')
+    import_parser.add_argument('--department', '-d', required=True, help='Department code')
+    import_parser.add_argument('--auto-update', '-u', action='store_true', help='Auto-update existing report')
+    
+    # Batch import command
+    batch_parser = subparsers.add_parser('batch', help='Import multiple reports')
+    batch_parser.add_argument('--files', '-f', nargs='+', required=True, help='Excel file paths')
+    batch_parser.add_argument('--employees', '-e', nargs='+', required=True, help='Employee codes')
+    batch_parser.add_argument('--departments', '-d', nargs='+', required=True, help='Department codes')
+    batch_parser.add_argument('--auto-update', '-u', action='store_true', help='Auto-update existing reports')
+    
+    # View command
+    view_parser = subparsers.add_parser('view', help='View report summary')
+    view_parser.add_argument('--report', '-r', required=True, help='Report code')
+    
+    # Validate command
+    validate_parser = subparsers.add_parser('validate', help='Run validation checks')
+    
+    return parser
 
 
 def main():
-    """Entry point"""
-    # Kết nối DB
-    client, db = connect_mongodb()
+    """Main entry point"""
+    # Setup
+    setup_logging()
+    settings = Settings()
+    
+    # Validate settings
+    is_valid, error = settings.validate()
+    if not is_valid:
+        logger.error(f"Invalid settings: {error}")
+        print(f"✗ Configuration error: {error}")
+        sys.exit(1)
+    
+    # Parse arguments
+    parser = create_cli_parser()
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        sys.exit(0)
     
     try:
-        # Dữ liệu mẫu
-        employee = {
-            "employeeCode": "NV001",
-            "fullName": "Nguyễn Khắc Trung",
-            "email": "trung@company.com",
-            "department": {"code": "IT", "name": "Phòng CNTT"},
-            "position": {"code": "LEADER", "name": "Trưởng nhóm"},
-            "status": "active",
-            "createdAt": datetime.now(),
-            "updatedAt": datetime.now()
-        }
+        # Initialize client
+        logger.info("Connecting to Google Sheets...")
+        client = GoogleSheetsClient(settings)
         
-        excel_files = ["reports/baocao_NV001.xlsx"]
+        if not client.test_connection():
+            print("✗ Failed to connect to Google Sheets")
+            sys.exit(1)
         
-        # Import một file
-        import_single_report(db, excel_files[0], employee)
+        print("✓ Connected to Google Sheets")
         
-        # Hoặc import nhiều file
-        # import_batch_reports(db, excel_files, [employee])
+        # Initialize service
+        report_service = ReportService(client)
         
-    finally:
-        close_mongodb(client)
+        # Execute command
+        if args.command == 'import':
+            import_single_report(
+                report_service,
+                args.file,
+                args.employee,
+                args.department,
+                args.auto_update
+            )
+        
+        elif args.command == 'batch':
+            import_batch_reports(
+                report_service,
+                args.files,
+                args.employees,
+                args.departments,
+                args.auto_update
+            )
+        
+        elif args.command == 'view':
+            view_report_summary(report_service, args.report)
+        
+        elif args.command == 'validate':
+            run_validation(client)
+        
+        print("\\n✓ Complete")
+        
+    except KeyboardInterrupt:
+        print("\\n\\n⚠️  Interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
+        print(f"\\n✗ Fatal error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     # main()
-    excel_path = './input/202509_Bao cao cong viec_thinhdv.xlsx'
-    sheet_name = 'Th8-T9'
-    work_report = extract_work_report_from_excel(excel_path, sheet_name, {"employeeCode":"NV001"})
+    import_single_report(
+        ReportService(GoogleSheetsClient(Settings())),
+        "./input/202509_Bao cao cong viec_thinhdv.xlsx",
+        "NV001",
+        "IT",
+        auto_update=False
+    )

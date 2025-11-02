@@ -1,9 +1,10 @@
 import json
 from typing import List, Dict
 import pandas as pd
-from utils.parsers import parse_stt, parse_date, parse_cost
+from utils.cleaner import clean_frequency
+from utils.parsers import parse_emty_string, parse_stt, parse_date, parse_cost
 from config.settings import DEFAULT_COST_UNIT
-
+import re
 
 def parse_tasks_from_dataframe(df: pd.DataFrame, task_type: str = "actual", prefix: str = "T") -> List[Dict]:
     """
@@ -20,8 +21,18 @@ def parse_tasks_from_dataframe(df: pd.DataFrame, task_type: str = "actual", pref
     tasks = []
     task_id_counter = 1
     stt_to_task_id = {}
-    df.to_csv("output.csv", index=False, encoding='utf-16') 
-
+    # df.to_csv("output.csv", index=False, encoding='utf-16') 
+    # print(df.columns.tolist())
+    
+    # clean data
+    
+    df['frequency'] = df['Từ'].apply(clean_frequency)
+    columns_to_clean = ['Đánh giá khó khăn thuận lợi/Tồn đọng', 'Kết quả thực hiện', 'Đ/G KQ','Loại công việc','Chi phí thực hiện (VNĐ)']
+    for col in columns_to_clean:
+        if col in df.columns:
+            df[col] = df[col].apply(parse_emty_string)
+        
+    pass
     # Pass 1: Parse tất cả tasks
     for idx, row in df.iterrows():
         if pd.isna(row.get('Công việc', '')) or str(row.get('Công việc', '')).strip() == '':
@@ -44,22 +55,24 @@ def parse_tasks_from_dataframe(df: pd.DataFrame, task_type: str = "actual", pref
             "level": level,
             "taskName": str(row.get('Công việc', '')).strip(),
             "taskType": str(row.get('Loại công việc', '')).strip(),
+            "frequency": str(row.get('frequency', '')).strip(),
             "startDate": parse_date(row.get('Từ', '')),
             "endDate": parse_date(row.get('Đến', '')),
-            "description": str(row.get('Mô tả yêu cầu, giải pháp để thực hiện', '')).strip(),
-            "solution": str(row.get('Mô tả yêu cầu, giải pháp để thực hiện', '')).strip(),
-            "notes": "",
+            # "notes": "",
             "hasSubtasks": False,
             "subtaskCount": 0,
-            "children": []
+            # "children": []
         }
         
         if task_type == "actual":
+            task["result"] = str(row.get('Kết quả thực hiện', '')).strip()
+            task["challenges"] = str(row.get('Đánh giá khó khăn thuận lợi/Tồn đọng', '')).strip()
             task["evaluation"] = str(row.get('Đ/G KQ', '')).strip()
-            task["actualStartDate"] = task["startDate"]
-            task["actualEndDate"] = task["endDate"] if task["evaluation"] == "Hoàn thành" else None
-            task["completionRate"] = 100 if task["evaluation"] == "Hoàn thành" else 0
+            # task["actualStartDate"] = task["startDate"]
+            # task["actualEndDate"] = task["endDate"] if task["evaluation"] == "Hoàn thành" else None
+            # task["completionRate"] = 100 if task["evaluation"] == "Hoàn thành" else 0
         else:
+            task["desc"] = str(row.get('Mô tả yêu cầu, giải pháp để thực hiện', '')).strip()
             task["estimatedCost"] = parse_cost(row.get('Chi phí thực hiện (VNĐ)', '0'))
             task["costUnit"] = DEFAULT_COST_UNIT
         
@@ -72,8 +85,8 @@ def parse_tasks_from_dataframe(df: pd.DataFrame, task_type: str = "actual", pref
             if parent:
                 parent['hasSubtasks'] = True
                 parent['subtaskCount'] += 1
-                parent['children'].append(task['taskId'])
-    for task in tasks:
-        print(f"{task['stt']}: {task['taskName']}-{task['hasSubtasks']}")
+                # parent['children'].append(task['taskId'])
+    # for task in tasks:
+    #     print(f"{task['stt']}: {task['taskName']}-{task['frequency']}")
 
     return tasks
