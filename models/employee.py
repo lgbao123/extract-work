@@ -39,6 +39,49 @@ class Employee(BaseModel):
         if self.manager_code:
             self.manager_code = self.manager_code.strip()
     
+    def to_sheet_dict(self) -> dict:
+        """Convert to dictionary for Google Sheets (camelCase columns)"""
+        return {
+            'employeeCode': self.employee_code,
+            'fullName': self.full_name,
+            'email': self.email or '',
+            'departmentCode': self.department_code or '',
+            'departmentName': self.department_name or '',
+            'position': self.position or '',
+            'managerCode': self.manager_code or '',
+            'createdAt': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else '',
+            'updatedAt': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else ''
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Employee':
+        """Create Employee from dictionary (handles both camelCase and snake_case)"""
+        # Convert camelCase keys to snake_case
+        normalized = {
+            'employee_code': data.get('employeeCode') or data.get('employee_code', ''),
+            'full_name': data.get('fullName') or data.get('full_name', ''),
+            'email': data.get('email'),
+            'department_code': data.get('departmentCode') or data.get('department_code'),
+            'department_name': data.get('departmentName') or data.get('department_name'),
+            'position': data.get('position'),
+            'manager_code': data.get('managerCode') or data.get('manager_code'),
+        }
+        
+        # Handle timestamps
+        for key in ['created_at', 'updated_at']:
+            camel_key = 'createdAt' if key == 'created_at' else 'updatedAt'
+            value = data.get(camel_key) or data.get(key)
+            if value and isinstance(value, str):
+                from datetime import datetime
+                try:
+                    normalized[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    normalized[key] = None
+            else:
+                normalized[key] = value
+        
+        return cls(**normalized)
+    
     def __str__(self) -> str:
         return f"Employee({self.employee_code}: {self.full_name})"
     

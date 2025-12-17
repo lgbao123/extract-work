@@ -25,7 +25,7 @@ def clean_string(text: Optional[str]) -> str:
         >>> clean_string(None)
         ''
     """
-    if text is None:
+    if text is None or text.lower() == "nan":
         return ""
     
     # Convert to string
@@ -126,7 +126,7 @@ def parse_cost(cost_str: Optional[str]) -> float:
         >>> parse_cost("$1,000")
         1000.0
     """
-    if cost_str is None or cost_str == "":
+    if cost_str is None or cost_str == "" or cost_str.lower() == "nan":
         return 0.0
     
     # Convert to string and clean

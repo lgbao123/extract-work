@@ -34,6 +34,32 @@ class Review(BaseModel):
             'createdAt': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else ''
         }
     
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Review':
+        """Create Review from dictionary (handles both camelCase and snake_case)"""
+        from datetime import datetime
+        
+        # Normalize keys
+        normalized = {
+            'report_code': data.get('reportCode') or data.get('report_code', ''),
+            'daily_work_review': data.get('dailyWorkReview') or data.get('daily_work_review'),
+            'professional_review': data.get('professionalReview') or data.get('professional_review'),
+        }
+        
+        # Handle timestamps
+        for key in ['created_at', 'updated_at']:
+            camel_key = 'createdAt' if key == 'created_at' else 'updatedAt'
+            value = data.get(camel_key) or data.get(key)
+            if value and isinstance(value, str):
+                try:
+                    normalized[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    normalized[key] = None
+            else:
+                normalized[key] = value
+        
+        return cls(**normalized)
+    
     def __str__(self) -> str:
         return f"Review({self.report_code})"
     

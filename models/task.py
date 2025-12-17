@@ -25,8 +25,8 @@ class Task(BaseModel):
     start_date: Optional[str] = None  # Format: YYYY-MM-DD
     end_date: Optional[str] = None    # Format: YYYY-MM-DD
     frequency: Optional[str] = None   # For recurring tasks (e.g., "Hằng ngày", "Hằng tuần")
-    description: Optional[str] = None
-    solution: Optional[str] = None
+    # description: Optional[str] = None
+    # result: Optional[str] = None
     level: int = 0  # Hierarchy level (0, 1, 2, ...)
     parent_task_id: Optional[str] = None
     has_subtasks: bool = False
@@ -82,14 +82,62 @@ class Task(BaseModel):
             'startDate': self.start_date or '',
             'endDate': self.end_date or '',
             'frequency': self.frequency or '',
-            'description': self.description or '',
-            'solution': self.solution or '',
+            # 'description': self.description or '',
+            # 'result': self.result or '',
             'level': self.level,
             'parentTaskId': self.parent_task_id or '',
             'hasSubtasks': self.has_subtasks,
             'subtaskCount': self.subtask_count,
             'createdAt': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else ''
         }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Task':
+        """Create Task from dictionary (handles both camelCase and snake_case)"""
+        # Normalize keys
+        normalized = {
+            'task_id': data.get('taskId') or data.get('task_id', ''),
+            'report_code': data.get('reportCode') or data.get('report_code', ''),
+            'stt': str(data.get('stt', '')),  # Always convert to string
+            'task_name': data.get('taskName') or data.get('task_name', ''),
+            'task_type': data.get('taskType') or data.get('task_type'),
+            'start_date': data.get('startDate') or data.get('start_date'),
+            'end_date': data.get('endDate') or data.get('end_date'),
+            'frequency': data.get('frequency'),
+            # 'description': data.get('description'),
+            # 'result': data.get('result'),
+            'level': int(data.get('level', 0)) if data.get('level') else 0,
+            'parent_task_id': data.get('parentTaskId') or data.get('parent_task_id'),
+            'has_subtasks': bool(data.get('hasSubtasks') or data.get('has_subtasks', False)),
+            'subtask_count': int(data.get('subtaskCount') or data.get('subtask_count', 0)),
+        }
+        
+        # Handle category enum
+        category_val = data.get('category')
+        if category_val:
+            if isinstance(category_val, TaskCategory):
+                normalized['category'] = category_val
+            elif isinstance(category_val, str):
+                try:
+                    normalized['category'] = TaskCategory(category_val)
+                except ValueError:
+                    normalized['category'] = TaskCategory.FUNCTIONAL
+        else:
+            normalized['category'] = TaskCategory.FUNCTIONAL
+        
+        # Handle timestamps
+        for key in ['created_at', 'updated_at']:
+            camel_key = 'createdAt' if key == 'created_at' else 'updatedAt'
+            value = data.get(camel_key) or data.get(key)
+            if value and isinstance(value, str):
+                try:
+                    normalized[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    normalized[key] = None
+            else:
+                normalized[key] = value
+        
+        return cls(**normalized)
     
     def __str__(self) -> str:
         return f"Task({self.stt}: {self.task_name})"
@@ -99,25 +147,59 @@ class Task(BaseModel):
 class ActualTask(Task):
     """Actual task with evaluation field"""
     
+    results: Optional[str] = None
+    challenges: Optional[str] = None
     evaluation: Optional[str] = None
     
     def to_sheet_dict(self) -> dict:
         """Convert to dictionary for Tasks_Actual sheet"""
         data = super().to_sheet_dict()
+        data['results'] = self.results or ''
+        data['challenges'] = self.challenges or ''
         data['evaluation'] = self.evaluation or ''
         return data
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'ActualTask':
+        """Create ActualTask from dictionary"""
+        # Get base task fields using parent from_dict
+        task = super().from_dict(data)
+        
+        # Add ActualTask specific field
+        task_dict = task.__dict__.copy()
+        task_dict['results'] = data.get('results')
+        task_dict['challenges'] = data.get('challenges')
+        task_dict['evaluation'] = data.get('evaluation')
+        
+        return cls(**task_dict)
 
 
 @dataclass
 class PlannedTask(Task):
     """Planned task with cost fields"""
     
+    description: Optional[str] = None
     cost: float = 0.0
     cost_unit: str = "VND"
     
     def to_sheet_dict(self) -> dict:
         """Convert to dictionary for Tasks_Planned sheet"""
         data = super().to_sheet_dict()
+        data['description'] = self.description or ''
         data['cost'] = self.cost
         data['costUnit'] = self.cost_unit
         return data
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'PlannedTask':
+        """Create PlannedTask from dictionary"""
+        # Get base task fields using parent from_dict
+        task = super().from_dict(data)
+        
+        # Add PlannedTask specific fields
+        task_dict = task.__dict__.copy()
+        task_dict['description'] = data.get('description')
+        task_dict['cost'] = float(data.get('cost', 0.0))
+        task_dict['cost_unit'] = data.get('costUnit') or data.get('cost_unit', 'VND')
+        
+        return cls(**task_dict)

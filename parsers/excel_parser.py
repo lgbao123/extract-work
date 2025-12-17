@@ -127,10 +127,28 @@ class ExcelParser(BaseParser):
         except Exception as e:
             raise ParsingError(f"Failed to extract period: {e}") from e
         
+        # Extract employee name from first 10 rows
+        employee_name = ""
+        for row in range(1, 11):
+            # Check multiple columns for employee name
+            for col in range(1, 5):
+                cell_value = str(self.sheet.cell(row, col).value or "")
+                    # Extract name after "Nhân viên:" or " - Nhân Viên"
+                if "nhân viên:" in str.lower(cell_value):
+                    employee_name = clean_string(cell_value.split("Nhân Viên:")[1])
+                elif "- nhân viên" in str.lower(cell_value):
+                    employee_name = clean_string(cell_value.split("-")[0].split(".")[-1])
+                if employee_name:
+                    break
+            if employee_name:
+                break
+        
         return {
             'title': title,
-            'period': period
+            'period': period,
+            'employee_name': employee_name
         }
+        
     
     def _find_sections(self) -> Dict[str, Optional[int]]:
         """
@@ -237,7 +255,7 @@ class ExcelParser(BaseParser):
                 sheet_name=self.sheet_name or 0,
                 skiprows=header_row - 1 ,  # Skip to data rows
                 header=[0, 1],  # Multi-level header
-                nrows=(end_row - header_row) + 1
+                nrows=(end_row - header_row) - 1 
             )
             # Adjust DataFrame to start from correct row
             df = df.iloc[(start_row - header_row) - 2:]
@@ -245,7 +263,7 @@ class ExcelParser(BaseParser):
             df = self.transformer.flatten_multiindex_columns(df)
             
             # Clean DataFrame
-            df = df.dropna(how='all')
+            df = df.dropna(subset=[df.columns[1]])
             
             # Parse each row
             for idx, row in df.iterrows():
@@ -289,9 +307,9 @@ class ExcelParser(BaseParser):
         # End date
         end_date = parse_date(row.get('Thời gian thực hiện_Đến', ''))
         
-        # Description and solution
-        description = clean_string(str(row.get('Mô tả yêu cầu, giải pháp để thực hiện', '')))
-        solution = clean_string(str(row.get('Mô tả yêu cầu, giải pháp để thực hiện', '')))
+        # Description, Result
+        # description = clean_string(str(row.get('Mô tả yêu cầu, giải pháp để thực hiện', '')))
+        # result = clean_string(str(row.get('Kết quả thực hiện', '')))
         
         # Parse STT for level
         level, parent_stt = parse_stt(stt)
@@ -307,8 +325,7 @@ class ExcelParser(BaseParser):
             'start_date': start_date.strftime('%Y-%m-%d') if start_date else None,
             'end_date': end_date.strftime('%Y-%m-%d') if end_date else None,
             'frequency': frequency,
-            'description': description,
-            'solution': solution,
+            # 'result': result,
             'level': level,
             'parent_task_id': None,  # Will be set in hierarchy establishment
             'has_subtasks': False,
@@ -318,11 +335,19 @@ class ExcelParser(BaseParser):
         # Create appropriate task type
         if task_type == 'actual':
             evaluation = clean_string(str(row.get('Đ/G KQ', '')))
-            return ActualTask(**task_data, evaluation=evaluation)
+            challenges = clean_string(str(row.get('Đánh giá khó khăn thuận lợi/Tồn đọng', '')))
+            result = clean_string(str(row.get('Kết quả thực hiện', '')))
+            return ActualTask(**task_data, evaluation=evaluation, challenges=challenges, results=result)
         else:
-            cost_str = clean_string(str(row.get('Chi phí thực hiện (VNĐ)', '0')))
+            description_value = row.get('Mô tả yêu cầu, giải pháp để thực hiện', '')
+            if isinstance(description_value, pd.Series):
+                description = clean_string(str(description_value.iloc[0] if len(description_value) > 0 else ''))
+            else:
+                description = clean_string(str(description_value))
+   
+            cost_str = clean_string(str(row.get('Chi phí thực hiện (VNĐ)')))
             cost = self.transformer.parse_cost(cost_str)
-            return PlannedTask(**task_data, cost=cost, cost_unit='VND')
+            return PlannedTask(**task_data, description=description, cost=cost, cost_unit='VND')
     
     def _establish_hierarchy(self, tasks: List) -> List:
         """

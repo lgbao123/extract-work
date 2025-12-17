@@ -81,13 +81,8 @@ class WorkReport(BaseModel):
         if self.department_code:
             self.department_code = self.department_code.strip().upper()
     
-    def get_main_sheet_data(self) -> Dict[str, Any]:
-        """
-        Get data for Work_Reports sheet (without nested objects)
-        
-        Returns:
-            Dictionary with flat structure for spreadsheet
-        """
+    def to_sheet_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for Google Sheets (camelCase columns)"""
         return {
             'reportCode': self.report_code,
             'employeeCode': self.employee_code,
@@ -102,6 +97,55 @@ class WorkReport(BaseModel):
             'createdAt': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else '',
             'updatedAt': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else ''
         }
+    
+    def get_main_sheet_data(self) -> Dict[str, Any]:
+        """Alias for to_sheet_dict() for backward compatibility"""
+        return self.to_sheet_dict()
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'WorkReport':
+        """Create WorkReport from dictionary (handles both camelCase and snake_case)"""
+        from datetime import datetime
+        
+        # Normalize keys (support both naming conventions)
+        normalized = {
+            'report_code': data.get('reportCode') or data.get('report_code', ''),
+            'employee_code': data.get('employeeCode') or data.get('employee_code', ''),
+            'employee_name': data.get('employeeName') or data.get('employee_name', ''),
+            'department_code': data.get('departmentCode') or data.get('department_code'),
+            'report_period_year': data.get('reportPeriodYear') or data.get('report_period_year'),
+            'report_period_month': data.get('reportPeriodMonth') or data.get('report_period_month'),
+            'report_period_start_date': data.get('reportPeriodStartDate') or data.get('report_period_start_date'),
+            'report_period_end_date': data.get('reportPeriodEndDate') or data.get('report_period_end_date'),
+            'version': data.get('version', 1),
+        }
+        
+        # Handle status enum
+        status_val = data.get('status')
+        if status_val:
+            if isinstance(status_val, ReportStatus):
+                normalized['status'] = status_val
+            elif isinstance(status_val, str):
+                try:
+                    normalized['status'] = ReportStatus(status_val)
+                except ValueError:
+                    normalized['status'] = ReportStatus.DRAFT
+        else:
+            normalized['status'] = ReportStatus.DRAFT
+        
+        # Handle timestamps
+        for key in ['created_at', 'updated_at']:
+            camel_key = 'createdAt' if key == 'created_at' else 'updatedAt'
+            value = data.get(camel_key) or data.get(key)
+            if value and isinstance(value, str):
+                try:
+                    normalized[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    normalized[key] = None
+            else:
+                normalized[key] = value
+        
+        return cls(**normalized)
     
     def __str__(self) -> str:
         return f"WorkReport({self.report_code}: {self.employee_name})"

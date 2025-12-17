@@ -43,7 +43,7 @@ def import_single_report(report_service: ReportService,
         excel_path = "./input/202509_Bao cao cong viec_thinhdv.xlsx"
         employee_code = "NV001"
         department_code = "IT"
-        auto_update = False
+        auto_update = True
         
         result = report_service.import_from_excel(
             file_path=excel_path,

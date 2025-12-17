@@ -272,7 +272,8 @@ def _prepare_task_data(task: Dict, report_code: str, category: str, is_planned: 
     task_data = {
         'taskId': task.get('taskId', str(uuid.uuid4())),
         'reportCode': report_code,
-        'stt': task.get('stt', ''),
+        # Prefix with apostrophe to force Google Sheets to treat as text
+        'stt': "'" + str(task.get('stt', '')),
         'taskName': task.get('taskName', ''),
         'taskType': task.get('taskType', ''),
         'category': category,
