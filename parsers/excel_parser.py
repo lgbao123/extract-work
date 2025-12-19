@@ -112,7 +112,8 @@ class ExcelParser(BaseParser):
         
         # Search first 10 rows for title
         for row in range(1, 11):
-            cell_value = self.sheet.cell(row, 1).value
+            cell_values = [self.sheet.cell(row, col).value for col in range(1, 8)]
+            cell_value = " ".join([str(cv) for cv in cell_values if cv is not None])
             if cell_value and "Từ ngày" in str(cell_value):
                 title = str(cell_value)
                 break
@@ -131,17 +132,19 @@ class ExcelParser(BaseParser):
         employee_name = ""
         for row in range(1, 11):
             # Check multiple columns for employee name
-            for col in range(1, 5):
-                cell_value = str(self.sheet.cell(row, col).value or "")
-                    # Extract name after "Nhân viên:" or " - Nhân Viên"
-                if "nhân viên:" in str.lower(cell_value):
-                    employee_name = clean_string(cell_value.split("Nhân Viên:")[1])
-                elif "- nhân viên" in str.lower(cell_value):
-                    employee_name = clean_string(cell_value.split("-")[0].split(".")[-1])
-                if employee_name:
-                    break
+            # for col in range(1, 5):
+            #     cell_value = str(self.sheet.cell(row, col).value or "")
+            cell_values = [self.sheet.cell(row, col).value for col in range(1, 8)]
+            cell_value = " ".join([str(cv) for cv in cell_values if cv is not None])
+            # Extract name after "Nhân viên:" or " - Nhân Viên"
+            if "nhân viên:" in str.lower(cell_value):
+                employee_name = clean_string(cell_value.split(":")[1])
+            elif "- nhân viên" in str.lower(cell_value):
+                employee_name = clean_string(cell_value.split("-")[0].split(".")[-1])
             if employee_name:
                 break
+            # if employee_name:
+            #     break
         
         return {
             'title': title,
@@ -179,11 +182,18 @@ class ExcelParser(BaseParser):
             cell_str = str(cell_value).strip()
             row_str = row_value.strip()
             # Check each keyword
-            for key, keyword in keywords.items():
-                if str.lower(keyword) in str.lower(row_str) and sections[key] is None:
-                    if row_idx not in sections.values():
-                        sections[key] = row_idx
-                        logger.debug(f"Found section '{key}' at row {row_idx}")
+            for key, keywords_list in keywords.items():
+                # Support both string and list of keywords
+                if isinstance(keywords_list, str):
+                    keywords_list = [keywords_list]
+                
+                # Check if any keyword matches
+                for keyword in keywords_list:
+                    if str.lower(keyword) in str.lower(row_str) and sections[key] is None:
+                        if row_idx not in sections.values():
+                            sections[key] = row_idx
+                            logger.debug(f"Found section '{key}' at row {row_idx}")
+                            break  # Stop checking other keywords once found
         
         logger.debug(f"Sections found: {sections}")
         return sections
@@ -206,7 +216,7 @@ class ExcelParser(BaseParser):
 
         header_row = sections['actual'] + 1
         start_row = sections['actual_project'] + 1
-        end_row = sections['actual_review'] - 1 
+        end_row = sections['actual_review'] - 1  if sections['actual_review'] else sections['planned'] -1
 
         return self._parse_task_section(start_row, end_row, header_row, 'actual', TaskCategory.PROJECT)
 
@@ -255,7 +265,8 @@ class ExcelParser(BaseParser):
                 sheet_name=self.sheet_name or 0,
                 skiprows=header_row - 1 ,  # Skip to data rows
                 header=[0, 1],  # Multi-level header
-                nrows=(end_row - header_row) - 1 
+                nrows=(end_row - header_row) - 1,
+                dtype={'Stt': str, 'Unnamed: 0_level_1': str}  # Force STT to be read as string
             )
             # Adjust DataFrame to start from correct row
             df = df.iloc[(start_row - header_row) - 2:]

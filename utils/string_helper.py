@@ -31,12 +31,15 @@ def clean_string(text: Optional[str]) -> str:
     # Convert to string
     text = str(text).strip()
     
-    # Remove multiple spaces
-    text = re.sub(r'\s+', ' ', text)
+    # Escape strings that look like numbers with dots (e.g., "2.2")
+    # if re.compile(r'^\d+\.\d+$').match(text):
+    #     return f"'" + text
+    # # Remove multiple spaces
+    # text = re.sub(r'\s+', ' ', text)
     
-    # Remove special characters that cause issues
-    text = text.replace('\x00', '')  # Null characters
-    text = text.replace('\r', '')    # Carriage returns
+    # # Remove special characters that cause issues
+    # text = text.replace('\x00', '')  # Null characters
+    # text = text.replace('\r', '')    # Carriage returns
     
     return text
 
@@ -222,3 +225,22 @@ def extract_numbers(text: str) -> list:
         return []
     
     return re.findall(r'\d+', text)
+
+
+def string_escaping(value: str) -> str:
+    """
+    Escape special characters in string for Google Sheets
+        if string is "2.2"return "'2.2"
+        if string cotains "-ABC -XYZ" return "'-ABC\n -XYZ"
+    Args:
+        value: Input string
+    Returns:
+        Escaped string
+    """
+    # if isinstance(value, str):
+    #     if re.compile(r'^\d+\.\d+$').match(value):
+    #         return f"' {value}"
+    #     if '-' in value:
+    #         return "'" + value.replace(' -', '\n -')
+    # return value
+    pass

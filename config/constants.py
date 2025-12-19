@@ -49,14 +49,14 @@ DATE_FORMATS: List[str] = [
 
 
 # Excel section keywords for parsing
-EXCEL_SECTION_KEYWORDS: Dict[str, str] = {
-    "actual": "A. Thực hiện công việc tháng",
-    "actual_functional": "CÔNG VIỆC THEO CHỨC NĂNG",
-    "actual_project": "CÔNG VIỆC THAM GIA CÁC DỰ ÁN",
-    "actual_review": "ĐÁNH GIÁ CHUNG",
-    "planned": "B. Kế hoạch công việc tháng tiếp theo",
-    "planned_functional": "CÔNG VIỆC THEO CHỨC NĂNG",
-    "planned_project": "CÔNG VIỆC THAM GIA CÁC DỰ ÁN",
+EXCEL_SECTION_KEYWORDS: Dict[str, List[str]] = {
+    "actual": ["A. Thực hiện công việc tháng","Báo cáo công việc thực hiện trong tháng"],
+    "actual_functional": ["CÔNG VIỆC THEO CHỨC NĂNG"],
+    "actual_project": ["CÔNG VIỆC THAM GIA CÁC DỰ ÁN"],
+    "actual_review": ["ĐÁNH GIÁ CHUNG"],
+    "planned": ["Kế hoạch công việc tháng tiếp theo:"],
+    "planned_functional": ["CÔNG VIỆC THEO CHỨC NĂNG"],
+    "planned_project": ["CÔNG VIỆC THAM GIA CÁC DỰ ÁN"],
 }
 
 

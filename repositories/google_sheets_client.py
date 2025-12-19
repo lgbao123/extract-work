@@ -4,6 +4,7 @@ Google Sheets Client
 Manages connection and basic operations with Google Sheets
 """
 
+import re
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
@@ -14,7 +15,7 @@ from config import Settings
 from config.constants import SheetName, COLUMN_MAPPINGS
 from utils import ConnectionError, get_logger
 from utils.decorators import retry, rate_limit
-
+from utils.string_helper import string_escaping
 logger = get_logger(__name__)
 
 
@@ -160,30 +161,41 @@ class GoogleSheetsClient:
     
     @rate_limit(calls_per_period=30, period=60)
     def write_sheet(self, sheet_name: str, df: pd.DataFrame,
-                    append: bool = False) -> None:
+                    append: bool = True) -> None:
         """
-        Write DataFrame to sheet
+        Append DataFrame to sheet
         
         Args:
             sheet_name: Name of sheet
             df: DataFrame to write
-            append: Whether to append or replace
+            append: Whether to append (default: True, parameter kept for backward compatibility)
         """
         try:
             worksheet = self.get_worksheet(sheet_name)
             
-            if append:
-                # Get existing data
-                existing_df = self.read_sheet(sheet_name)
-                
-                # Append new data
-                combined_df = pd.concat([existing_df, df], ignore_index=True)
-                set_with_dataframe(worksheet, combined_df, include_index=False)
-            else:
-                # Replace all data
-                set_with_dataframe(worksheet, df, include_index=False)
+            # Ensure STT column is treated as string to preserve leading zeros and trailing zeros
+            df_copy = df.copy()
+            stt_col_index = None
+            if 'stt' in df_copy.columns:
+                df_copy['stt'] = df_copy['stt'].astype(str)
+                stt_col_index = df_copy.columns.get_loc('stt')
             
-            logger.info(f"Wrote {len(df)} rows to {sheet_name}")
+            # Get the last row with data
+            existing_values = worksheet.get_all_values()
+            next_row = len(existing_values) + 1
+            
+            # If sheet is empty, write with header
+            if next_row == 1:
+                set_with_dataframe(worksheet, df_copy, include_index=False, include_column_header=True, row=1)
+            else:
+                # Append without header
+                set_with_dataframe(worksheet, df_copy, include_index=False, include_column_header=False, row=next_row)
+            
+            # Format STT column as TEXT to preserve values like "3.10"
+            if stt_col_index is not None:
+                self._format_column_as_text(worksheet, stt_col_index)
+            
+            logger.info(f"Appended {len(df)} rows to {sheet_name}")
             
         except Exception as e:
             logger.error(f"Failed to write to sheet {sheet_name}: {e}")
@@ -224,11 +236,18 @@ class GoogleSheetsClient:
         """
         df = self.read_sheet(sheet_name)
         
+        if df.empty:
+            return pd.DataFrame()
+        
         if column not in df.columns:
             logger.warning(f"Column '{column}' not found in {sheet_name}")
             return pd.DataFrame()
         
-        result = df[df[column] == value]
+        # Convert both to string for comparison to handle type mismatches
+        df[column] = df[column].astype(str)
+        value_str = str(value)
+        
+        result = df[df[column] == value_str]
         logger.debug(f"Found {len(result)} rows where {column}={value}")
         
         return result
@@ -252,12 +271,20 @@ class GoogleSheetsClient:
         try:
             df = self.read_sheet(sheet_name)
             
+            if df.empty:
+                logger.debug(f"Sheet {sheet_name} is empty")
+                return 0
+            
             if condition_column not in df.columns:
                 logger.warning(f"Column '{condition_column}' not found")
                 return 0
             
+            # Convert both to string for comparison to handle type mismatches
+            df[condition_column] = df[condition_column].astype(str)
+            condition_value_str = str(condition_value)
+            
             # Find matching rows
-            mask = df[condition_column] == condition_value
+            mask = df[condition_column] == condition_value_str
             count = mask.sum()
             
             if count == 0:
@@ -269,8 +296,10 @@ class GoogleSheetsClient:
                 if col in df.columns:
                     df.loc[mask, col] = val
             
-            # Write back
-            self.write_sheet(sheet_name, df, append=False)
+            # Replace entire sheet with updated data
+            worksheet = self.get_worksheet(sheet_name)
+            worksheet.clear()
+            set_with_dataframe(worksheet, df, include_index=False, include_column_header=True)
             
             logger.info(f"Updated {count} rows in {sheet_name}")
             return count
@@ -294,24 +323,38 @@ class GoogleSheetsClient:
             Number of rows deleted
         """
         try:
-            df = self.read_sheet(sheet_name)
+            worksheet = self.get_worksheet(sheet_name)
             
-            if column not in df.columns:
-                logger.warning(f"Column '{column}' not found")
+            # Get all values to find matching rows
+            all_values = worksheet.get_all_values()
+            
+            if not all_values:
+                logger.debug(f"No data in sheet {sheet_name}")
                 return 0
             
-            # Count rows to delete
-            count = (df[column] == value).sum()
+            # Get header row and find column index
+            headers = all_values[0]
+            try:
+                col_index = headers.index(column)
+            except ValueError:
+                logger.warning(f"Column '{column}' not found in headers")
+                return 0
+            
+            # Find row indices to delete (in reverse order to avoid index shifting)
+            rows_to_delete = []
+            for row_idx, row in enumerate(all_values[1:], start=2):  # Start from 2 (skip header)
+                if col_index < len(row) and row[col_index] == str(value):
+                    rows_to_delete.append(row_idx)
+            
+            count = len(rows_to_delete)
             
             if count == 0:
                 logger.debug(f"No rows found where {column}={value}")
                 return 0
             
-            # Remove rows
-            df = df[df[column] != value]
-            
-            # Write back
-            self.write_sheet(sheet_name, df, append=False)
+            # Delete rows in reverse order to maintain correct indices
+            for row_idx in reversed(rows_to_delete):
+                worksheet.delete_rows(row_idx)
             
             logger.info(f"Deleted {count} rows from {sheet_name}")
             return count
@@ -319,6 +362,28 @@ class GoogleSheetsClient:
         except Exception as e:
             logger.error(f"Failed to delete rows from {sheet_name}: {e}")
             raise
+    
+    def _format_column_as_text(self, worksheet, col_index: int) -> None:
+        """
+        Format a column as TEXT to preserve values like "3.10"
+        
+        Args:
+            worksheet: The worksheet object
+            col_index: Zero-based column index
+        """
+        try:
+            # Format the entire column as TEXT
+            worksheet.format(
+                f"{chr(65 + col_index)}:{chr(65 + col_index)}",
+                {
+                    "numberFormat": {
+                        "type": "TEXT"
+                    }
+                }
+            )
+            logger.debug(f"Formatted column {col_index} as TEXT")
+        except Exception as e:
+            logger.warning(f"Could not format column as TEXT: {e}")
     
     def test_connection(self) -> bool:
         """

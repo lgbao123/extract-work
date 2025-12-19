@@ -26,18 +26,25 @@ class Employee(BaseModel):
         """Validate and normalize data after initialization"""
         # Call parent __post_init__ to set timestamps
         super().__post_init__()
-        # Strip whitespace
-        self.employee_code = self.employee_code.strip() if self.employee_code else ""
-        self.full_name = self.full_name.strip() if self.full_name else ""
+        
+        # Convert to string and strip whitespace
+        self.employee_code = str(self.employee_code).strip() if self.employee_code else ""
+        self.full_name = str(self.full_name).strip() if self.full_name else ""
         
         if self.email:
-            self.email = self.email.strip().lower()
+            self.email = str(self.email).strip().lower()
         
         if self.department_code:
-            self.department_code = self.department_code.strip().upper()
+            self.department_code = str(self.department_code).strip().upper()
+        
+        if self.department_name:
+            self.department_name = str(self.department_name).strip()
+        
+        if self.position:
+            self.position = str(self.position).strip()
         
         if self.manager_code:
-            self.manager_code = self.manager_code.strip()
+            self.manager_code = str(self.manager_code).strip()
     
     def to_sheet_dict(self) -> dict:
         """Convert to dictionary for Google Sheets (camelCase columns)"""

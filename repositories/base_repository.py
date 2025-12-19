@@ -82,6 +82,14 @@ class BaseRepository(ABC, Generic[T]):
             RepositoryError: If creation fails
         """
         try:
+            # Check if record already exists
+            id_value = self.get_id_value(model)
+            existing = self.get_by_id(id_value)
+            
+            if existing:
+                logger.warning(f"{self.sheet_name} record already exists: {id_value}")
+                return existing
+            
             # Convert to dict
             data = self.model_to_dict(model)
             
@@ -97,7 +105,7 @@ class BaseRepository(ABC, Generic[T]):
             # Write to sheet
             self.client.write_sheet(self.sheet_name, df, append=True)
             
-            logger.info(f"Created {self.sheet_name} record: {self.get_id_value(model)}")
+            logger.info(f"Created {self.sheet_name} record: {id_value}")
             
             # Update model with timestamps
             if hasattr(model, 'created_at'):

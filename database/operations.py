@@ -244,22 +244,57 @@ def _update_tasks(spreadsheet, work_report: Dict):
     """Update tasks - xóa cũ và insert mới"""
     report_code = work_report['reportCode']
     
+    print(f"  → Xóa tasks cũ cho report: {report_code}")
+    
     # Delete old actual tasks
     worksheet = spreadsheet.worksheet(SHEET_TASKS_ACTUAL)
     df = get_as_dataframe(worksheet, evaluate_formulas=True)
     df = df.dropna(how='all')
+    
     if not df.empty and 'reportCode' in df.columns:
+        before_count = len(df)
         df = df[df['reportCode'] != report_code]
-        set_with_dataframe(worksheet, df)
+        after_count = len(df)
+        deleted = before_count - after_count
+        print(f"  → Đã xóa {deleted} actual tasks")
+        
+        # Clear entire sheet first
+        worksheet.clear()
+        # Write back the cleaned data (or just headers if empty)
+        if not df.empty:
+            set_with_dataframe(worksheet, df, include_index=False, include_column_header=True)
+        else:
+            # Restore headers if all data was deleted
+            headers = ['taskId', 'reportCode', 'stt', 'taskName', 'taskType', 'category',
+                      'frequency', 'startDate', 'endDate', 'result', 'description', 'solution',
+                      'level', 'parentTaskId', 'hasSubtasks', 'subtaskCount', 'createdAt']
+            worksheet.append_row(headers)
     
     # Delete old planned tasks
     worksheet = spreadsheet.worksheet(SHEET_TASKS_PLANNED)
     df = get_as_dataframe(worksheet, evaluate_formulas=True)
     df = df.dropna(how='all')
-    if not df.empty and 'reportCode' in df.columns:
-        df = df[df['reportCode'] != report_code]
-        set_with_dataframe(worksheet, df)
     
+    if not df.empty and 'reportCode' in df.columns:
+        before_count = len(df)
+        df = df[df['reportCode'] != report_code]
+        after_count = len(df)
+        deleted = before_count - after_count
+        print(f"  → Đã xóa {deleted} planned tasks")
+        
+        # Clear entire sheet first
+        worksheet.clear()
+        # Write back the cleaned data (or just headers if empty)
+        if not df.empty:
+            set_with_dataframe(worksheet, df, include_index=False, include_column_header=True)
+        else:
+            # Restore headers if all data was deleted
+            headers = ['taskId', 'reportCode', 'stt', 'taskName', 'taskType', 'category',
+                      'frequency', 'startDate', 'endDate', 'description', 'solution', 'cost', 'costUnit',
+                      'level', 'parentTaskId', 'hasSubtasks', 'subtaskCount', 'createdAt']
+            worksheet.append_row(headers)
+    
+    print(f"  → Thêm tasks mới...")
     # Insert new tasks
     _insert_tasks(spreadsheet, work_report)
 

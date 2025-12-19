@@ -24,14 +24,14 @@ class Department(BaseModel):
         # Call parent __post_init__ to set timestamps
         super().__post_init__()
         
-        self.department_code = self.department_code.strip().upper() if self.department_code else ""
-        self.department_name = self.department_name.strip() if self.department_name else ""
+        self.department_code = str(self.department_code).strip().upper() if self.department_code else ""
+        self.department_name = str(self.department_name).strip() if self.department_name else ""
         
         if self.manager_code:
-            self.manager_code = self.manager_code.strip()
+            self.manager_code = str(self.manager_code).strip()
         
         if self.parent_department_code:
-            self.parent_department_code = self.parent_department_code.strip().upper()
+            self.parent_department_code = str(self.parent_department_code).strip().upper()
     
     def to_sheet_dict(self) -> dict:
         """Convert to dictionary for Google Sheets (camelCase columns)"""

@@ -40,8 +40,13 @@ def import_single_report(report_service: ReportService,
     print(f"\\n📄 Processing file: {excel_path}")
     
     try:
-        excel_path = "./input/202509_Bao cao cong viec_thinhdv.xlsx"
-        employee_code = "NV001"
+        # excel_path = "./input/202509_Bao cao cong viec_thinhdv.xlsx"
+        # employee_code = "NV001"
+        # department_code = "IT"
+        # auto_update = True
+        
+        excel_path = "./input/202509_Bao cao cong viec_Thanhhm.xlsx"
+        employee_code = "NV002"
         department_code = "IT"
         auto_update = True
         
