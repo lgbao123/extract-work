@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 import uuid
-
+from datetime import datetime
 from .base_parser import BaseParser
 from .transformers import DataTransformer
 from models import ActualTask, PlannedTask, ReportPeriod
@@ -19,8 +19,11 @@ from utils import (
     parse_date, 
     parse_stt,
     clean_string,
-    get_logger
+    get_logger,
+    
 )
+
+from utils.string_helper import capitalize_words
 from config.constants import EXCEL_SECTION_KEYWORDS, TaskCategory
 
 logger = get_logger(__name__)
@@ -114,7 +117,7 @@ class ExcelParser(BaseParser):
         for row in range(1, 11):
             cell_values = [self.sheet.cell(row, col).value for col in range(1, 8)]
             cell_value = " ".join([str(cv) for cv in cell_values if cv is not None])
-            if cell_value and "Từ ngày" in str(cell_value):
+            if cell_value and "từ ngày" in str(cell_value).lower():
                 title = str(cell_value)
                 break
         
@@ -143,13 +146,12 @@ class ExcelParser(BaseParser):
                 employee_name = clean_string(cell_value.split("-")[0].split(".")[-1])
             if employee_name:
                 break
-            # if employee_name:
-            #     break
+   
         
         return {
             'title': title,
             'period': period,
-            'employee_name': employee_name
+            'employee_name': capitalize_words(employee_name)
         }
         
     
@@ -301,23 +303,21 @@ class ExcelParser(BaseParser):
         task_type_val = clean_string(str(row.get('Loại công việc', '')))
         
         # Handle "Từ" column - can be date or frequency
-        from_value = row.get('Thời gian thực hiện_Từ', '')
+        from_value = str(row.get('Thời gian thực hiện_Từ', ''))
         start_date = None
+        end_date = None
         frequency = None
         
         # Try to parse as date first
         parsed_date = parse_date(from_value)
-        if parsed_date:
+        if isinstance(parsed_date, datetime):
             start_date = parsed_date
-        else:
-            # If not a date, treat as frequency text
-            freq_str = clean_string(str(from_value))
-            if freq_str and freq_str.lower() != 'nan' and freq_str.lower() != 'none':
-                frequency = freq_str
-        
-        # End date
-        end_date = parse_date(row.get('Thời gian thực hiện_Đến', ''))
-        
+            end_date = parse_date(row.get('Thời gian thực hiện_Đến', ''))
+        elif not parsed_date and from_value:
+            fq_str = clean_string(str(from_value))
+            if fq_str and fq_str.lower() not in ['nan', 'none','nat']:
+                    frequency = fq_str
+
         # Description, Result
         # description = clean_string(str(row.get('Mô tả yêu cầu, giải pháp để thực hiện', '')))
         # result = clean_string(str(row.get('Kết quả thực hiện', '')))

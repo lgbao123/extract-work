@@ -8,6 +8,21 @@ import re
 from typing import Optional, Tuple
 from .exceptions import ParsingError
 
+def capitalize_words(text: Optional[str]) -> str:
+    """
+    Capitalize the first letter of each word in the string  
+    Args:
+        text: Input string
+    Returns:
+        Capitalized string
+
+    """ 
+    if text is None:
+        return ""
+    
+    text = str(text).strip().lower()
+    
+    return ' '.join(word.capitalize() for word in text.split())
 
 def clean_string(text: Optional[str]) -> str:
     """
@@ -227,20 +242,21 @@ def extract_numbers(text: str) -> list:
     return re.findall(r'\d+', text)
 
 
-def string_escaping(value: str) -> str:
-    """
-    Escape special characters in string for Google Sheets
-        if string is "2.2"return "'2.2"
-        if string cotains "-ABC -XYZ" return "'-ABC\n -XYZ"
-    Args:
-        value: Input string
-    Returns:
-        Escaped string
-    """
-    # if isinstance(value, str):
-    #     if re.compile(r'^\d+\.\d+$').match(value):
-    #         return f"' {value}"
-    #     if '-' in value:
-    #         return "'" + value.replace(' -', '\n -')
-    # return value
-    pass
+# def string_escaping(value: str) -> str:
+#     """
+#     Escape special characters in string for Google Sheets
+#         if string is "2.2"return "'2.2"
+#         if string cotains "-ABC -XYZ" return "'-ABC\n -XYZ"
+#     Args:
+#         value: Input string
+#     Returns:
+#         Escaped string
+#     """
+#     # if isinstance(value, str):
+#     #     if re.compile(r'^\d+\.\d+$').match(value):
+#     #         return f"' {value}"
+#     #     if '-' in value:
+#     #         return "'" + value.replace(' -', '\n -')
+#     # return value
+#     pass
+

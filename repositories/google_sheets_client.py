@@ -5,22 +5,28 @@ Manages connection and basic operations with Google Sheets
 """
 
 import re
+import time
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
 from typing import Optional, List, Dict, Any
+from gspread.exceptions import APIError
 
 from config import Settings
 from config.constants import SheetName, COLUMN_MAPPINGS
 from utils import ConnectionError, get_logger
 from utils.decorators import retry, rate_limit
-from utils.string_helper import string_escaping
+
 logger = get_logger(__name__)
 
 
 class GoogleSheetsClient:
     """Google Sheets API client"""
+    
+    # Class-level write tracker to enforce global rate limit
+    _write_calls = []
+    _max_writes_per_minute = 50  # Conservative limit (actual is 60)
     
     def __init__(self, settings: Optional[Settings] = None):
         """
@@ -33,6 +39,41 @@ class GoogleSheetsClient:
         self.client: Optional[gspread.Client] = None
         self.spreadsheet: Optional[gspread.Spreadsheet] = None
         self._connect()
+    
+    @classmethod
+    def _wait_for_write_quota(cls) -> None:
+        """Wait if write quota limit is approaching"""
+        now = time.time()
+        
+        # Remove old calls outside the 60-second window
+        cls._write_calls = [call_time for call_time in cls._write_calls if now - call_time < 60]
+        
+        # If approaching limit, wait
+        if len(cls._write_calls) >= cls._max_writes_per_minute:
+            wait_time = 60 - (now - cls._write_calls[0]) + 2  # Add 2 second buffer
+            logger.warning(f"Write quota limit approaching. Waiting {wait_time:.1f}s...")
+            time.sleep(wait_time)
+            # Clean up after waiting
+            now = time.time()
+            cls._write_calls = [call_time for call_time in cls._write_calls if now - call_time < 60]
+        
+        # Add current write
+        cls._write_calls.append(now)
+        
+        # Add delay between writes
+        time.sleep(1.5)
+    
+    def _handle_api_error(self, error: Exception, operation: str, retry_count: int = 0) -> None:
+        """Handle API errors with exponential backoff for quota errors"""
+        if isinstance(error, APIError):
+            error_dict = error.response.json().get('error', {})
+            if error_dict.get('code') == 429 or 'RATE_LIMIT_EXCEEDED' in str(error):
+                wait_time = (2 ** retry_count) * 5  # Exponential: 5s, 10s, 20s, 40s...
+                logger.warning(f"Quota exceeded during {operation}. Waiting {wait_time}s before retry...")
+                time.sleep(wait_time)
+                if retry_count < 5:  # Max 5 retries
+                    return
+        raise error
     
     @retry(max_attempts=3, delay=2, backoff=2)
     def _connect(self) -> None:
@@ -159,7 +200,6 @@ class GoogleSheetsClient:
             logger.error(f"Failed to read sheet {sheet_name}: {e}")
             raise
     
-    @rate_limit(calls_per_period=30, period=60)
     def write_sheet(self, sheet_name: str, df: pd.DataFrame,
                     append: bool = True) -> None:
         """
@@ -170,38 +210,53 @@ class GoogleSheetsClient:
             df: DataFrame to write
             append: Whether to append (default: True, parameter kept for backward compatibility)
         """
-        try:
-            worksheet = self.get_worksheet(sheet_name)
-            
-            # Ensure STT column is treated as string to preserve leading zeros and trailing zeros
-            df_copy = df.copy()
-            stt_col_index = None
-            if 'stt' in df_copy.columns:
-                df_copy['stt'] = df_copy['stt'].astype(str)
-                stt_col_index = df_copy.columns.get_loc('stt')
-            
-            # Get the last row with data
-            existing_values = worksheet.get_all_values()
-            next_row = len(existing_values) + 1
-            
-            # If sheet is empty, write with header
-            if next_row == 1:
-                set_with_dataframe(worksheet, df_copy, include_index=False, include_column_header=True, row=1)
-            else:
-                # Append without header
-                set_with_dataframe(worksheet, df_copy, include_index=False, include_column_header=False, row=next_row)
-            
-            # Format STT column as TEXT to preserve values like "3.10"
-            if stt_col_index is not None:
-                self._format_column_as_text(worksheet, stt_col_index)
-            
-            logger.info(f"Appended {len(df)} rows to {sheet_name}")
-            
-        except Exception as e:
-            logger.error(f"Failed to write to sheet {sheet_name}: {e}")
-            raise
+        retry_count = 0
+        max_retries = 5
+        
+        while retry_count < max_retries:
+            try:
+                # Wait for quota availability
+                self._wait_for_write_quota()
+                
+                worksheet = self.get_worksheet(sheet_name)
+                
+                # Ensure STT column is treated as string to preserve leading zeros and trailing zeros
+                df_copy = df.copy()
+                stt_col_index = None
+                if 'stt' in df_copy.columns:
+                    df_copy['stt'] = df_copy['stt'].astype(str)
+                    stt_col_index = df_copy.columns.get_loc('stt')
+                
+                # Get the last row with data
+                existing_values = worksheet.get_all_values()
+                next_row = len(existing_values) + 1
+                
+                # If sheet is empty, write with header
+                if next_row == 1:
+                    set_with_dataframe(worksheet, df_copy, include_index=False, include_column_header=True, row=1)
+                else:
+                    # Append without header
+                    set_with_dataframe(worksheet, df_copy, include_index=False, include_column_header=False, row=next_row)
+                
+                # Format STT column as TEXT to preserve values like "3.10"
+                if stt_col_index is not None:
+                    self._wait_for_write_quota()  # Format is also a write operation
+                    self._format_column_as_text(worksheet, stt_col_index)
+                
+                logger.info(f"Appended {len(df)} rows to {sheet_name}")
+                return
+                
+            except Exception as e:
+                if 'RATE_LIMIT_EXCEEDED' in str(e) or '429' in str(e):
+                    self._handle_api_error(e, 'write_sheet', retry_count)
+                    retry_count += 1
+                else:
+                    logger.error(f"Failed to write to sheet {sheet_name}: {e}")
+                    raise
+        
+        raise Exception(f"Failed to write to {sheet_name} after {max_retries} retries")
     
-    @rate_limit(calls_per_period=30, period=60)
+    @rate_limit(calls_per_period=10, period=60)
     def append_rows(self, sheet_name: str, rows: List[List[Any]]) -> None:
         """
         Append rows to sheet
@@ -252,7 +307,6 @@ class GoogleSheetsClient:
         
         return result
     
-    @rate_limit(calls_per_period=30, period=60)
     def update_rows(self, sheet_name: str, 
                     condition_column: str, condition_value: Any,
                     updates: Dict[str, Any]) -> int:
@@ -268,47 +322,57 @@ class GoogleSheetsClient:
         Returns:
             Number of rows updated
         """
-        try:
-            df = self.read_sheet(sheet_name)
-            
-            if df.empty:
-                logger.debug(f"Sheet {sheet_name} is empty")
-                return 0
-            
-            if condition_column not in df.columns:
-                logger.warning(f"Column '{condition_column}' not found")
-                return 0
-            
-            # Convert both to string for comparison to handle type mismatches
-            df[condition_column] = df[condition_column].astype(str)
-            condition_value_str = str(condition_value)
-            
-            # Find matching rows
-            mask = df[condition_column] == condition_value_str
-            count = mask.sum()
-            
-            if count == 0:
-                logger.debug(f"No rows found where {condition_column}={condition_value}")
-                return 0
-            
-            # Apply updates
-            for col, val in updates.items():
-                if col in df.columns:
-                    df.loc[mask, col] = val
-            
-            # Replace entire sheet with updated data
-            worksheet = self.get_worksheet(sheet_name)
-            worksheet.clear()
-            set_with_dataframe(worksheet, df, include_index=False, include_column_header=True)
-            
-            logger.info(f"Updated {count} rows in {sheet_name}")
-            return count
-            
-        except Exception as e:
-            logger.error(f"Failed to update rows in {sheet_name}: {e}")
-            raise
+        retry_count = 0
+        max_retries = 5
+        
+        while retry_count < max_retries:
+            try:
+                df = self.read_sheet(sheet_name)
+                
+                if df.empty:
+                    logger.debug(f"Sheet {sheet_name} is empty")
+                    return 0
+                
+                if condition_column not in df.columns:
+                    logger.warning(f"Column '{condition_column}' not found")
+                    return 0
+                
+                # Convert both to string for comparison to handle type mismatches
+                df[condition_column] = df[condition_column].astype(str)
+                condition_value_str = str(condition_value)
+                
+                # Find matching rows
+                mask = df[condition_column] == condition_value_str
+                count = mask.sum()
+                
+                if count == 0:
+                    logger.debug(f"No rows found where {condition_column}={condition_value}")
+                    return 0
+                
+                # Apply updates
+                for col, val in updates.items():
+                    if col in df.columns:
+                        df.loc[mask, col] = val
+                
+                # Wait for quota and replace entire sheet with updated data
+                self._wait_for_write_quota()
+                worksheet = self.get_worksheet(sheet_name)
+                worksheet.clear()
+                set_with_dataframe(worksheet, df, include_index=False, include_column_header=True)
+                
+                logger.info(f"Updated {count} rows in {sheet_name}")
+                return count
+                
+            except Exception as e:
+                if 'RATE_LIMIT_EXCEEDED' in str(e) or '429' in str(e):
+                    self._handle_api_error(e, 'update_rows', retry_count)
+                    retry_count += 1
+                else:
+                    logger.error(f"Failed to update rows in {sheet_name}: {e}")
+                    raise
+        
+        raise Exception(f"Failed to update {sheet_name} after {max_retries} retries")
     
-    @rate_limit(calls_per_period=30, period=60)
     def delete_rows(self, sheet_name: str,
                     column: str, value: Any) -> int:
         """
@@ -354,6 +418,7 @@ class GoogleSheetsClient:
             
             # Delete rows in reverse order to maintain correct indices
             for row_idx in reversed(rows_to_delete):
+                self._wait_for_write_quota()  # Each delete is a write operation
                 worksheet.delete_rows(row_idx)
             
             logger.info(f"Deleted {count} rows from {sheet_name}")

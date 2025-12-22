@@ -85,7 +85,7 @@ def timing(func: Callable) -> Callable:
 
 def rate_limit(calls_per_period: int = 50, period: float = 60.0):
     """
-    Rate limiting decorator
+    Rate limiting decorator with automatic waiting
     
     Args:
         calls_per_period: Maximum number of calls allowed
@@ -109,15 +109,22 @@ def rate_limit(calls_per_period: int = 50, period: float = 60.0):
             # Remove old calls outside the period
             calls = [call_time for call_time in calls if now - call_time < period]
             
-            # Check if limit exceeded
+            # Check if limit exceeded - wait if necessary
             if len(calls) >= calls_per_period:
-                wait_time = period - (now - calls[0])
-                raise RateLimitError(
-                    f"Rate limit exceeded. Please wait {wait_time:.1f}s before retrying."
+                wait_time = period - (now - calls[0]) + 1.0  # Add 1 second buffer
+                logger.warning(
+                    f"Rate limit approaching for {func.__name__}. Waiting {wait_time:.1f}s..."
                 )
+                time.sleep(wait_time)
+                # Clean up old calls after waiting
+                now = time.time()
+                calls = [call_time for call_time in calls if now - call_time < period]
             
             # Add current call
             calls.append(now)
+            
+            # Add small delay between calls to avoid bursts
+            time.sleep(0.5)
             
             return func(*args, **kwargs)
         

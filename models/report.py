@@ -24,7 +24,7 @@ class ReportPeriod:
     def to_dict(self) -> Dict[str, Any]:
         return {
             'year': self.year,
-            'month': self.month,
+            'month': self.month + 1,
             'start_date': self.start_date,
             'end_date': self.end_date
         }

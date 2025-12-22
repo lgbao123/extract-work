@@ -7,7 +7,8 @@ Utility functions for date parsing and formatting
 from datetime import datetime
 from typing import Optional, Dict
 import re
-
+import pandas as pd
+import numpy as np
 from config.constants import DATE_FORMATS
 from .exceptions import ParsingError
 
@@ -100,7 +101,7 @@ def extract_period_from_text(text: str) -> Dict[str, any]:
         
     Examples:
         >>> extract_period_from_text("Từ ngày 20/08/2025 đến hết ngày 20/09/2025")
-        {'year': 2025, 'month': 8, 'start_date': '2025-08-20', 'end_date': '2025-09-20'}
+        {'year': 2025, 'month': 9, 'start_date': '2025-08-20', 'end_date': '2025-09-20'}
     """
     if not text:
         raise ParsingError("Empty text provided")
@@ -132,7 +133,7 @@ def extract_period_from_text(text: str) -> Dict[str, any]:
     
     return {
         'year': start_year,
-        'month': start_month,
+        'month': end_month,
         'start_date': format_date(start_date),
         'end_date': format_date(end_date)
     }

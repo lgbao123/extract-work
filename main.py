@@ -40,15 +40,24 @@ def import_single_report(report_service: ReportService,
     print(f"\\n📄 Processing file: {excel_path}")
     
     try:
-        # excel_path = "./input/202509_Bao cao cong viec_thinhdv.xlsx"
-        # employee_code = "NV001"
+        # excel_path = "./input/T11_2025/2025 T11_Bao cao cong viec_thinhdv.xlsx"
+        excel_path = "./input/T10_2025/2025 T10_Bao cao cong viec_thinhdv.xlsx"
+        employee_code = "NV001"
+        department_code = "IT"
+        auto_update = True
+        
+        
+        
+        # excel_path = "./input/T11_2025/Bao cao cong viec_Thanhhm.xlsx"
+        # employee_code = "NV002"
         # department_code = "IT"
         # auto_update = True
         
-        excel_path = "./input/202509_Bao cao cong viec_Thanhhm.xlsx"
-        employee_code = "NV002"
-        department_code = "IT"
-        auto_update = True
+        
+        # excel_path = "./input/T11_2025/202511_Bao_cao_cong_viec_vinhhq.xlsx"
+        # employee_code = "NV003"
+        # department_code = "IT"
+        # auto_update = True
         
         result = report_service.import_from_excel(
             file_path=excel_path,

@@ -37,9 +37,11 @@ class ReportStatus(str, Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
 
-
 # Date formats for parsing
 DATE_FORMATS: List[str] = [
+## 2025-11-05 00:00:00
+    "%Y-%m-%d %H:%M:%S",
+    "%d-%m-%Y %H:%M:%S",
     "%d/%m/%Y",
     "%d/%m/%y",
     "%Y-%m-%d",
